@@ -1,24 +1,24 @@
 ﻿using UnityEngine;
-using System.Collections;
-using System.Collections.Generic;
-using System.Xml;
-using System.Xml.Serialization;
+using ProtoBuf;
 
+[ProtoContract]
+[ProtoInclude(100, typeof(ClanCoreMigrationEvent))]
+[ProtoInclude(200, typeof(ClanDemandsInfluenceDecisionEvent))]
+[ProtoInclude(300, typeof(ClanSplitDecisionEvent))]
+[ProtoInclude(400, typeof(TribeSplitDecisionEvent))]
 public abstract class FactionEvent : WorldEvent {
 
-	[XmlAttribute("FactId")]
+	[ProtoMember(1)]
 	public long FactionId;
 
-	[XmlAttribute("OPolId")]
-	public long OriginalPolityId;
+    [ProtoMember(2)]
+    public long OriginalPolityId;
 
-//	[XmlAttribute("CPolId")]
+//	[ProtoMember(3)]
 //	public long CurrentPolityId;
 
-	[XmlIgnore]
 	public Faction Faction;
 
-	[XmlIgnore]
 	public Polity OriginalPolity;
 
 	public FactionEvent () {

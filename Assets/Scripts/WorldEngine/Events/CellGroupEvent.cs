@@ -1,15 +1,17 @@
 ﻿using UnityEngine;
-using System.Collections;
-using System.Collections.Generic;
-using System.Xml;
-using System.Xml.Serialization;
+using ProtoBuf;
 
+[ProtoContract]
+[ProtoInclude(100, typeof(CellGroupEventGeneratorEvent))]
+[ProtoInclude(200, typeof(ExpandPolityProminenceEvent))]
+[ProtoInclude(300, typeof(MigrateGroupEvent))]
+[ProtoInclude(400, typeof(TribeFormationEvent))]
+[ProtoInclude(500, typeof(UpdateCellGroupEvent))]
 public abstract class CellGroupEvent : WorldEvent
 {
-    [XmlAttribute("GId")]
+    [ProtoMember(1)]
     public long GroupId;
 
-    [XmlIgnore]
     public CellGroup Group;
 
     public CellGroupEvent()
@@ -21,7 +23,7 @@ public abstract class CellGroupEvent : WorldEvent
         base(
         group.World, 
         triggerDate, 
-        (id == null) ? GenerateUniqueIdentifier(group, triggerDate, eventTypeId) : id.Value, 
+        id ?? GenerateUniqueIdentifier(@group, triggerDate, eventTypeId), 
         eventTypeId, 
         originalSpawnDate)
     {
@@ -79,15 +81,15 @@ public abstract class CellGroupEvent : WorldEvent
             return false;
         }
 
-        if (Group == null)
-            return false;
-
-        return Group.StillPresent;
+        return Group != null && Group.StillPresent;
     }
 
     public override void FinalizeLoad()
     {
         base.FinalizeLoad();
+
+        //if (GroupId == 0)
+         //   return;
 
         Group = World.GetGroup(GroupId);
 

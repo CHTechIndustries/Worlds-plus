@@ -6,8 +6,7 @@ using System.Xml.Serialization;
 
 public abstract class CellGroupEvent : WorldEvent
 {
-    [XmlAttribute("GId")]
-    public long GroupId;
+    public Identifier GroupId;
 
     [XmlIgnore]
     public CellGroup Group;
@@ -17,7 +16,12 @@ public abstract class CellGroupEvent : WorldEvent
 
     }
 
-    public CellGroupEvent(CellGroup group, long triggerDate, long eventTypeId, long? id = null, long originalSpawnDate = -1) :
+    public CellGroupEvent(
+        CellGroup group,
+        long triggerDate,
+        long eventTypeId,
+        long? id = null,
+        long originalSpawnDate = -1) :
         base(
         group.World, 
         triggerDate, 
@@ -40,12 +44,10 @@ public abstract class CellGroupEvent : WorldEvent
 
     public static long GenerateUniqueIdentifier(CellGroup group, long triggerDate, long eventTypeId)
     {
-#if DEBUG
-        if (triggerDate >= World.MaxSupportedDate)
+        if (triggerDate > World.MaxSupportedDate)
         {
-            Debug.LogWarning("'triggerDate' shouldn't be greater than " + World.MaxSupportedDate + " (triggerDate = " + triggerDate + ")");
+            Debug.LogWarning("CellGroupEvent.GenerateUniqueIdentifier - 'triggerDate' is greater than " + World.MaxSupportedDate + " (triggerDate = " + triggerDate + ")");
         }
-#endif
 
         long id = (triggerDate * 1000000000L) + (group.Longitude * 1000000L) + (group.Latitude * 1000L) + eventTypeId;
 
@@ -58,7 +60,7 @@ public abstract class CellGroupEvent : WorldEvent
         if ((Manager.RegisterDebugEvent != null) && (Manager.TracingData.Priority <= 0))
         {
             //			if (Group.Id == Manager.TracingData.GroupId) {
-            string groupId = "Id:" + Group.Id + "|Long:" + Group.Longitude + "|Lat:" + Group.Latitude;
+            string groupId = "Id: " + Group + " Pos: " + Group.Position;
 
             SaveLoadTest.DebugMessage debugMessage = new SaveLoadTest.DebugMessage("CellGroupEvent - Group:" + groupId + ", Type: " + this.GetType(),
                 "SpawnDate: " + SpawnDate +
@@ -97,12 +99,7 @@ public abstract class CellGroupEvent : WorldEvent
         }
     }
 
-    protected override void DestroyInternal()
-    {
-        base.DestroyInternal();
-    }
-
-    public virtual void Reset(long newTriggerDate)
+    public override void Reset(long newTriggerDate)
     {
         Reset(newTriggerDate, GenerateUniqueIdentifier(Group, newTriggerDate, TypeId));
 

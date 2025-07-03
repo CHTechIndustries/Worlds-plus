@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using System.Xml.Serialization;
 using System.IO;
 using System.Threading;
+using UnityEngine.Profiling;
+using System;
+using UnityEngine.UIElements;
 
 public enum EditorBrushType
 {
@@ -25,7 +28,8 @@ public enum PlanetView
 {
     Elevation = 0,
     Biomes = 1,
-    Coastlines = 2
+    Coastlines = 2,
+    Debug = 3
 }
 
 public enum PlanetOverlay
@@ -43,11 +47,15 @@ public enum PlanetOverlay
     FactionCoreDistance,
     PolityProminence,
     PolityContacts,
+    PolityCoreRegions,
     PolityCulturalPreference,
     PolityCulturalActivity,
     PolityCulturalSkill,
     PolityCulturalKnowledge,
     PolityCulturalDiscovery,
+    PolityAdminCost,
+    PolitySelection,
+    FactionSelection,
     Temperature,
     Rainfall,
     DrainageBasins,
@@ -57,10 +65,18 @@ public enum PlanetOverlay
     BiomeTrait,
     Layer,
     Region,
+    RegionSelection,
+    CellSelection,
     Language,
     PopChange,
+    MigrationPressure,
+    PolityMigrationPressure,
     UpdateSpan,
-    PolityCluster
+    Migration,
+    PolityCluster,
+    ClusterAdminCost,
+    FormationDate,
+    HumanArrival
 }
 
 public enum OverlayColorId
@@ -83,6 +99,33 @@ public enum OverlayColorId
     RiverBasins = 14,
 }
 
+public enum DevMode
+{
+    None = 0,
+    Basic = 1,
+    Advanced = 2
+}
+
+public enum HighlightMode
+{
+    None = 0x0,
+    OnSelectedCell = 0x1,
+    OnSelectedCollection = 0x2,
+    OnSelected = 0x3,
+    OnHoveredCell = 0x4,
+    OnHoveredCollection = 0x8,
+    OnHovered = 0xC
+}
+
+public enum AutoSaveMode
+{
+    Deactivate,
+    OnRealWorldTime,
+    OnGameTime,
+    OnRealWorldOrGameTime,
+    OnRealWorldAndGameTime
+};
+
 public class Manager
 {
 #if DEBUG
@@ -94,18 +137,18 @@ public class Manager
 
     public class Debug_TracingData
     {
-        public long GroupId;
-        public long PolityId;
-        public long FactionId;
-        public long ClusterId;
-        public long RegionId;
+        public Identifier GroupId;
+        public Identifier PolityId;
+        public Identifier FactionId;
+        public Identifier ClusterId;
+        public Identifier RegionId;
         public int Longitude;
         public int Latitude;
         public int Priority;
         public long LastSaveDate;
     }
 
-    public static Debug_TracingData TracingData = new Debug_TracingData();
+    public static Debug_TracingData TracingData = new Manager.Debug_TracingData();
 
     public static bool TrackGenRandomCallers = false;
 #endif
@@ -114,10 +157,12 @@ public class Manager
 
     //	public static IRecorder Recorder = DefaultRecorder.Default;
 
-    public const string NoOverlaySubtype = "None";
+    public const string NoOverlaySubtype = "none";
+    public const string GroupProminenceOverlaySubtype = "prominence";
 
     public const int WorldWidth = 400;
     public const int WorldHeight = 200;
+    public const long PosIdOffset = long.MaxValue / (WorldWidth * WorldHeight);
 
     public const float BrushStrengthFactor_Base = 0.04f;
     public const float BrushStrengthFactor_Altitude = 0.5f;
@@ -127,16 +172,23 @@ public class Manager
 
     public const float BrushNoiseRadiusFactor = 200;
 
-    public const string DefaultModPath = @".\Mods\";
+    public const string DefaultModPath = "Mods";
 
     public const float StageProgressIncFromLoading = 0.1f;
 
     public const int MaxEditorBrushRadius = 25;
     public const int MinEditorBrushRadius = 1;
 
+    //AutoSave variable and function
+    public static AutoSaveMode AutoSaveMode = AutoSaveMode.Deactivate;
+    public static float RealWorldAutoSaveInterval = 600f; //600f = every 10 minutes
+    public static long AutoSaveInterval = 365000000; //365000000 = every one millon year
+
     public static bool LayersPresent = false;
 
     public static float LastStageProgress = 0;
+
+    public static EventManagerScript EventManager = null;
 
     public static Thread MainThread { get; private set; }
 
@@ -144,7 +196,8 @@ public class Manager
     public static string HeightmapsPath { get; private set; }
     public static string ExportPath { get; private set; }
 
-    public static string[] SupportedHeightmapFormats = new string[] { ".PSD", ".TIFF", ".JPG", ".TGA", ".PNG", ".BMP", ".PICT" };
+    public static string[] SupportedHeightmapFormats =
+        { ".PSD", ".TIFF", ".JPG", ".TGA", ".PNG", ".BMP", ".PICT" };
 
     public static string WorldName { get; set; }
 
@@ -170,6 +223,7 @@ public class Manager
 
     public static int PixelToCellRatio = 4;
 
+    public static int StartSpeedIndex = 7;
     public static float AltitudeScale = World.DefaultAltitudeScale;
     public static float SeaLevelOffset = 0;
     public static float RiverStrength = World.DefaultRiverStrength;
@@ -184,32 +238,71 @@ public class Manager
 
     public static bool FullScreenEnabled = false;
     public static bool UIScalingEnabled = false;
-    public static bool DebugModeEnabled = false;
     public static bool AnimationShadersEnabled = true;
 
-    public static List<string> ActiveModPaths = new List<string>() { @"Mods\Base" };
+    public static float KeyboardXAxisSensitivity = 50.0f;
+    public static float KeyboardYAxisSensitivity = 50.0f;
+    public static bool KeyboardInvertXAxis = false;
+    public static bool KeyboardInvertYAxis = false;
+
+    public static DevMode CurrentDevMode = DevMode.None;
+
+    public static List<string> ActiveModPaths = new List<string>() { Path.Combine(@"Mods", "Base") };
     public static bool ModsAlreadyLoaded = false;
 
-    public static Dictionary<string, LayerSettings> LayerSettings = new Dictionary<string, LayerSettings>();
+    public static Dictionary<string, LayerSettings> LayerSettings =
+        new Dictionary<string, LayerSettings>();
 
     public static GameMode GameMode = GameMode.None;
 
     public static bool ViewingGlobe = false;
 
+    public static int LastEventsTriggeredCount = 0;
+    public static int LastEventsEvaluatedCount = 0;
+
+    public static Dictionary<string, World.EventEvalStats> LastEventEvalStatsPerType =
+        new Dictionary<string, World.EventEvalStats>();
+
     public static int LastMapUpdateCount = 0;
     public static int LastPixelUpdateCount = 0;
-    public static long LastDateSpan = 0;
+    public static long LastDevModeDateSpan = 0;
+    public static long LastDevModeUpdateDate = 0;
+
+    public static long LastTextureUpdateDate = 0;
 
     public static bool DisableShortcuts = false;
 
+    public static InputRequest CurrentInputRequest = null;
+
+#if DEBUG
+    public static bool Debug_PauseSimRequested = false;
+    public static bool Debug_BreakRequested = false;
+    public static Identifier Debug_IdentifierOfInterest = "147918939:7115485649982034428";
+    public static Identifier Debug_IdentifierOfInterest2 = "97371564:7301682472976039088";
+    public static Identifier Debug_IdentifierOfInterest3 = "111147064:7417435791841258610";
+    public static Identifier Debug_IdentifierOfInterest4;
+
+    public static bool Debug_Flag1 = false;
+    public static bool Debug_Flag2 = false;
+#endif
+
+    public static bool PerformingAsyncTask { get; private set; }
+    public static bool SimulationRunning { get; private set; }
+    public static bool WorldIsReady { get; private set; }
+
+    public static long CurrentMaxUpdateSpan = 0;
+    public static float CurrentMaxAdminCost = 0;
+
+    public static int CurrentDiscoveryUid = 0;
+
     private static bool _isLoadReady = false;
 
-    private static string _debugLogFilename = @".\debug";
-    private static string _debugLogExt = @".log";
+    private static string _debugLogFilename = "debug";
+    private static string _debugLogExt = ".log";
     private static StreamWriter _debugLogStream = null;
     private static bool _backupDebugLog = false;
 
-    private static HashSet<TerrainCell> _lastUpdatedCells;
+    private static HashSet<TerrainCell> _lastUpdatedCells = new HashSet<TerrainCell>();
 
     private static int _resolutionWidthWindowed = 1600;
     private static int _resolutionHeightWindowed = 900;
@@ -223,11 +316,17 @@ public class Manager
 
     private static PlanetView _planetView = PlanetView.Biomes;
     private static PlanetOverlay _planetOverlay = PlanetOverlay.None;
-    private static string _planetOverlaySubtype = "None";
+    private static string _planetOverlaySubtype = NoOverlaySubtype;
 
-    private static List<Color> _biomePalette = new List<Color>();
-    private static List<Color> _mapPalette = new List<Color>();
-    private static List<Color> _overlayPalette = new List<Color>();
+    private static HighlightMode _highlightMode = HighlightMode.None;
+
+    private delegate bool FilterCollectionDelegate(ICellSet getter);
+
+    private static FilterCollectionDelegate _filterHighlightCollection = null;
+
+    private static readonly List<Color> _biomePalette = new List<Color>();
+    private static readonly List<Color> _mapPalette = new List<Color>();
+    private static readonly List<Color> _overlayPalette = new List<Color>();
 
     private static int _totalLoadTicks = 0;
     private static int _loadTicks = 0;
@@ -252,17 +351,19 @@ public class Manager
 
     private static bool _undoAndRedoBlocked = false;
 
-    private ProgressCastDelegate _progressCastMethod = null;
+    private static ProgressCastDelegate _progressCastMethod = null;
+
+    private static bool _simulationStep = false;
 
     private World _currentWorld = null;
-    
+
     private Texture2D _currentMapTexture = null;
     private Texture2D _currentMapOverlayTexture = null;
     private Texture2D _currentMapActivityTexture = null;
     private Texture2D _currentMapOverlayShaderInfoTexture = null;
 
     private Texture2D _pointerOverlayTexture = null;
-    
+
     private Color32[] _currentMapTextureColors = null;
     private Color32[] _currentMapOverlayTextureColors = null;
     private Color32[] _currentMapOverlayShaderInfoColor = null;
@@ -272,23 +373,26 @@ public class Manager
 
     private float?[,] _currentCellSlants;
 
-    private long _currentMaxUpdateSpan = 0;
-
     private Queue<IManagerTask> _taskQueue = new Queue<IManagerTask>();
 
-    private bool _performingAsyncTask = false;
-    private bool _simulationRunning = false;
-    private bool _worldReady = false;
+    private enum KeyEvent
+    {
+        KeyUp,
+        KeyDown,
+        Key
+    }
 
     public XmlAttributeOverrides AttributeOverrides { get; private set; }
 
-    public static bool PerformingAsyncTask => _manager._performingAsyncTask;
+    public static bool SimulationCanRun
+    {
+        get
+        {
+            bool canRun = (_manager._currentWorld.CellGroupCount > 0);
 
-    public static bool SimulationRunning => _manager._simulationRunning;
-
-    public static bool WorldIsReady => _manager._worldReady;
-
-    public static bool SimulationCanRun => _manager._currentWorld.CellGroupCount > 0;
+            return canRun;
+        }
+    }
 
     public static PlanetOverlay PlanetOverlay => _planetOverlay;
 
@@ -299,15 +403,15 @@ public class Manager
     public static bool DisplayGroupActivity => _displayGroupActivity;
 
     public static int UndoableEditorActionsCount => _undoableEditorActions.Count;
-
     public static int RedoableEditorActionsCount => _redoableEditorActions.Count;
+
+    public static bool SimulationPerformingStep => _simulationStep;
 
     public static void UpdateMainThreadReference()
     {
         MainThread = Thread.CurrentThread;
     }
 
-    /// <summary>Initializes the game manager.</summary>
     private Manager()
     {
         InitializeSavePath();
@@ -320,22 +424,12 @@ public class Manager
         UpdatedCells = new HashSet<TerrainCell>();
         TerrainUpdatedCells = new HashSet<TerrainCell>();
 
-        _lastUpdatedCells = new HashSet<TerrainCell>();
-
-        // static initializations
+        /// static initalizations
 
         Tribe.GenerateTribeNounVariations();
     }
 
-    /// <summary>
-    ///   Determines if the required control and shift keys were used, and that the user is not interacting with an input field.
-    /// </summary>
-    /// <param name="requireCtrl">If set to <c>true</c>, requires either control key.</param>
-    /// <param name="requireShift">If set to <c>true</c>, requires either shift key.</param>
-    /// <returns>
-    ///   <c>true</c> if the required control and shift keys were used; otherwise, <c>false</c>.
-    /// </returns>
-    private static bool CanHandleKeyInput(bool requireCtrl, bool requireShift)
+    private static bool CanHandleKeyInput(bool requireCtrl, bool requireShift, bool canDisable)
     {
         if (requireCtrl != (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl)))
             return false;
@@ -343,86 +437,124 @@ public class Manager
         if (requireShift != (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift)))
             return false;
 
-        if (DisableShortcuts)
+        if (canDisable && DisableShortcuts)
             return false;
 
         return true;
     }
 
-    /// <summary>Called on the frame when the key identified by <c>keyCode</c> has been released.</summary>
-    /// <param name="keyCode">The key code.</param>
-    /// <param name="requireCtrl">If set to <c>true</c>, requires either control key.</param>
-    /// <param name="requireShift">If set to <c>true</c>, requires either shift key.</param>
-    /// <param name="action">Function to be called if key input is valid.</param>
-    public static void HandleKeyUp(KeyCode keyCode, bool requireCtrl, bool requireShift, System.Action action)
+    public static void SetToPerformSimulationStep(bool state)
     {
-        if (!Input.GetKeyUp(keyCode))
-            return;
-
-        if (!CanHandleKeyInput(requireCtrl, requireShift))
-            return;
-
-        action.Invoke();
+        _simulationStep = state;
     }
 
-    /// <summary>Called when the key identified by <c>keyCode</c> is being held down.</summary>
-    /// <param name="keyCode">The key code.</param>
-    /// <param name="requireCtrl">If set to <c>true</c>, requires either control key.</param>
-    /// <param name="requireShift">If set to <c>true</c>, requires either shift key.</param>
-    /// <param name="action">Function to be called if key input is valid.</param>
-    public static void HandleKey(KeyCode keyCode, bool requireCtrl, bool requireShift, System.Action action)
+    private static bool _ShouldHandleKey(KeyEvent keyEvent, KeyCode keyCode, bool requireCtrl, bool requireShift, bool canDisable = true)
     {
-        if (!Input.GetKey(keyCode))
-            return;
+        bool handleKeyEvent;
+        switch (keyEvent)
+        {
+            case KeyEvent.Key:
+                handleKeyEvent = Input.GetKey(keyCode);
+                break;
+            case KeyEvent.KeyUp:
+                handleKeyEvent = Input.GetKeyUp(keyCode);
+                break;
+            case KeyEvent.KeyDown:
+                handleKeyEvent = Input.GetKeyDown(keyCode);
+                break;
+            default:
+                // throw an exception?
+                Debug.LogAssertion(String.Format("Invalid keyEvent passed [{0}], setting keyPressed to false", keyEvent));
+                handleKeyEvent = false;
+                break;
 
-        if (!CanHandleKeyInput(requireCtrl, requireShift))
-            return;
+        }
+        if (!handleKeyEvent)
+        {
+            return false;
+        }
 
-        action.Invoke();
+        if (!CanHandleKeyInput(requireCtrl, requireShift, canDisable))
+            return false;
+
+        return true;
     }
 
-    /// <summary>Called on the frame when a key identified by <c>keyCode</c> is initially pressed down.</summary>
-    /// <param name="keyCode">The key code.</param>
-    /// <param name="requireCtrl">If set to <c>true</c>, requires either control key.</param>
-    /// <param name="requireShift">If set to <c>true</c>, requires either shift key.</param>
-    /// <param name="action">Function to be called if key input is valid.</param>
-    public static void HandleKeyDown(KeyCode keyCode, bool requireCtrl, bool requireShift, System.Action action)
+    public static void HandleKeyUp(
+        KeyCode keyCode, bool requireCtrl, bool requireShift, System.Action action, bool canDisable = true)
     {
-        if (!Input.GetKeyDown(keyCode))
-            return;
-
-        if (!CanHandleKeyInput(requireCtrl, requireShift))
-            return;
-
-        action.Invoke();
+        if (_ShouldHandleKey(KeyEvent.KeyUp, keyCode, requireCtrl, requireShift, canDisable))
+        {
+            action.Invoke();
+        }
     }
 
-    /// <summary>Clears the layer settings.</summary>
+    public static void HandleKeyUp<T>(
+        KeyCode keyCode, bool requireCtrl, bool requireShift, System.Action<T> action, T actionParams, bool canDisable = true)
+    {
+        if (_ShouldHandleKey(KeyEvent.KeyUp, keyCode, requireCtrl, requireShift, canDisable))
+        {
+            action.Invoke(actionParams);
+        }
+    }
+
+    public static void HandleKey(
+        KeyCode keyCode, bool requireCtrl, bool requireShift, System.Action action, bool canDisable = true)
+    {
+        if (_ShouldHandleKey(KeyEvent.Key, keyCode, requireCtrl, requireShift, canDisable))
+        {
+            action.Invoke();
+        }
+    }
+
+    public static void HandleKey<T>(
+        KeyCode keyCode, bool requireCtrl, bool requireShift, System.Action<T> action, T actionParams, bool canDisable = true)
+    {
+        if (_ShouldHandleKey(KeyEvent.Key, keyCode, requireCtrl, requireShift, canDisable))
+        {
+            action.Invoke(actionParams);
+        }
+    }
+
+
+    public static void HandleKeyDown(
+        KeyCode keyCode, bool requireCtrl, bool requireShift, System.Action action, bool canDisable = true)
+    {
+        if (_ShouldHandleKey(KeyEvent.Key, keyCode, requireCtrl, requireShift, canDisable))
+        {
+            action.Invoke();
+        }
+    }
+
+    public static void HandleKeyDown<T>(
+        KeyCode keyCode, bool requireCtrl, bool requireShift, System.Action<T> action, T actionParams, bool canDisable = true)
+    {
+        if (_ShouldHandleKey(KeyEvent.Key, keyCode, requireCtrl, requireShift, canDisable))
+        {
+            action.Invoke(actionParams);
+        }
+    }
+
     public static void ResetLayerSettings()
     {
         LayerSettings.Clear();
     }
 
-    /// <summary>Sets the layer settings after reseting the old layer settings.</summary>
-    /// <param name="layerSettings">The list of layer settings to be set.</param>
     public static void SetLayerSettings(List<LayerSettings> layerSettings)
     {
         ResetLayerSettings();
-        
+
         foreach (LayerSettings settings in layerSettings)
         {
             LayerSettings.Add(settings.Id, settings);
         }
     }
 
-    /// <summary>Gets the associated layer settings for an id matching to <c>layerID</c>.</summary>
-    /// <param name="layerId">The layer identifier.</param>
-    /// <returns>
-    ///   The layer settings associated with <c>layerId</c>.
-    /// </returns>
     public static LayerSettings GetLayerSettings(string layerId)
     {
-        if (!LayerSettings.TryGetValue(layerId, out LayerSettings settings))
+        LayerSettings settings;
+
+        if (!LayerSettings.TryGetValue(layerId, out settings))
         {
             settings = new LayerSettings(Layer.Layers[layerId]);
             LayerSettings.Add(layerId, settings);
@@ -431,42 +563,31 @@ public class Manager
         return settings;
     }
 
-    /// <summary>Blocks the ability to undo and redo actions on the editor.</summary>
-    /// <param name="state">If set to <c>true</c>, blocking is active.</param>
     public static void BlockUndoAndRedo(bool state)
     {
         _undoAndRedoBlocked = state;
     }
 
-    /// <summary>Registers the listener for events related to the undoable action stack.</summary>
-    /// <param name="op">The listener to be registered.</param>
     public static void RegisterUndoStackUpdateOp(System.Action op)
     {
         _onUndoStackUpdate += op;
     }
 
-    /// <summary>Deregisters the listener for events related to the undoable action stack.</summary>
-    /// <param name="op">The listener to be deregistered.</param>
     public static void DeregisterUndoStackUpdateOp(System.Action op)
     {
         _onUndoStackUpdate -= op;
     }
 
-    /// <summary>Registers the listener for events related to the redoable action stack.</summary>
-    /// <param name="op">The listener to be registered.</param>
     public static void RegisterRedoStackUpdateOp(System.Action op)
     {
         _onRedoStackUpdate += op;
     }
 
-    /// <summary>Deregisters the listener for events related to the redoable action stack.</summary>
-    /// <param name="op">The listener to be deregistered.</param>
     public static void DeregisterRedoStackUpdateOp(System.Action op)
     {
         _onRedoStackUpdate -= op;
     }
 
-    /// <summary>Undoes the last action in the editor.</summary>
     public static void UndoEditorAction()
     {
         if (_undoAndRedoBlocked || EditorBrushIsActive)
@@ -482,7 +603,6 @@ public class Manager
         PushRedoableAction(action);
     }
 
-    /// <summary>Redoes the last action in the editor.</summary>
     public static void RedoEditorAction()
     {
         if (_undoAndRedoBlocked || EditorBrushIsActive)
@@ -498,8 +618,6 @@ public class Manager
         PushUndoableAction(action);
     }
 
-    /// <summary>Performs the action identified by <c>editorAction</c> in the editor.</summary>
-    /// <param name="editorAction">The action to be done in the editor.</param>
     public static void PerformEditorAction(EditorAction editorAction)
     {
         editorAction.Do();
@@ -508,24 +626,22 @@ public class Manager
         ResetRedoableActionsStack();
     }
 
-    /// <summary>Resets the undoable and redoable action stacks.</summary>
     public static void ResetActionStacks()
     {
         ResetUndoableActionsStack();
         ResetRedoableActionsStack();
     }
 
-    /// <summary>Pushes the undoable action identified by <c>action</c> onto the undoable stack.</summary>
-    /// <param name="action">The action to be pushed.</param>
     public static void PushUndoableAction(EditorAction action)
     {
         _undoableEditorActions.Push(action);
 
+        // The world needs drainage regen if the pushed action is a brush action
+        CurrentWorld.NeedsDrainageRegeneration |= action is BrushAction;
+
         _onUndoStackUpdate?.Invoke();
     }
 
-    /// <summary>Pushes the redoable action identified by <c>action</c> onto the redoable stack.</summary>
-    /// <param name="action">The action to be pushed.</param>
     public static void PushRedoableAction(EditorAction action)
     {
         _redoableEditorActions.Push(action);
@@ -533,23 +649,22 @@ public class Manager
         _onRedoStackUpdate?.Invoke();
     }
 
-    /// <summary>Pops the last action that can be undone.</summary>
-    /// <returns>
-    ///   Action last performed on the editor.
-    /// </returns>
     public static EditorAction PopUndoableAction()
     {
         EditorAction action = _undoableEditorActions.Pop();
+
+        // The world needs drainage regen if both the popped action 
+        // and the new action at top of the stack are brush actions
+        CurrentWorld.NeedsDrainageRegeneration =
+            (_undoableEditorActions.Count > 0) &&
+            (action is BrushAction) &&
+            (_undoableEditorActions.Peek() is BrushAction);
 
         _onUndoStackUpdate?.Invoke();
 
         return action;
     }
 
-    /// <summary>Pops the last action that can be redone.</summary>
-    /// <returns>
-    ///   Action last undone on the editor.
-    /// </returns>
     public static EditorAction PopRedoableAction()
     {
         EditorAction action = _redoableEditorActions.Pop();
@@ -559,24 +674,26 @@ public class Manager
         return action;
     }
 
-    /// <summary>Resets the undoable action stack.</summary>
     public static void ResetUndoableActionsStack()
     {
         _undoableEditorActions.Clear();
 
-        _onUndoStackUpdate?.Invoke();
+        if (_onUndoStackUpdate != null)
+        {
+            _onUndoStackUpdate.Invoke();
+        }
     }
 
-    /// <summary>Resets the redoable action stack.</summary>
     public static void ResetRedoableActionsStack()
     {
         _redoableEditorActions.Clear();
 
-        _onRedoStackUpdate?.Invoke();
+        if (_onRedoStackUpdate != null)
+        {
+            _onRedoStackUpdate.Invoke();
+        }
     }
 
-    /// <summary>Initializes the debug log.</summary>
-    /// <remarks>Will overwrite an old log with the same name.</remarks>
     public static void InitializeDebugLog()
     {
         if (_debugLogStream != null)
@@ -591,14 +708,22 @@ public class Manager
 
         _debugLogStream = File.CreateText(filename);
 
-        string buildType = Debug.isDebugBuild ? "debug" : "release";
+        string buildType;
 
-        _debugLogStream.WriteLine("Running Worlds " + Application.version + " (" + buildType + ")...");
+        if (Debug.isDebugBuild)
+        {
+            buildType = "Debug";
+        }
+        else
+        {
+            buildType = "Release";
+        }
+
+        _debugLogStream.WriteLine("Running Worlds " + Application.version +
+            " (" + Application.platform + " " + buildType + ")...");
         _debugLogStream.Flush();
     }
 
-    /// <summary>Closes the debug log.</summary>
-    /// <remarks>Will create a backup of the log if an exception occurs.</remarks>
     public static void CloseDebugLog()
     {
         if (_debugLogStream == null)
@@ -608,20 +733,14 @@ public class Manager
 
         _debugLogStream = null;
 
-        if (!_backupDebugLog)
-            return;
-
-        string logFilename = _debugLogFilename + _debugLogExt;
-
-        string backupFilename = _debugLogFilename + System.DateTime.Now.ToString("_dd_MM_yyyy_hh_mm_ss") + _debugLogExt;
-        
-        File.Copy(logFilename, backupFilename);
+        if (_backupDebugLog)
+        {
+            string logFilename = _debugLogFilename + _debugLogExt;
+            string backupFilename = _debugLogFilename + System.DateTime.Now.ToString("_dd_MM_yyyy_hh_mm_ss") + _debugLogExt;
+            File.Copy(logFilename, backupFilename);
+        }
     }
 
-    /// <summary>Handler used for logging, tracing and debugging.</summary>
-    /// <param name="logString">The string to be logged.</param>
-    /// <param name="stackTrace">The stack trace.</param>
-    /// <param name="type">The type of log message.</param>
     public static void HandleLog(string logString, string stackTrace, LogType type)
     {
         if (_debugLogStream == null)
@@ -631,9 +750,10 @@ public class Manager
 
         if (CurrentWorld != null)
         {
-            worldInfoStr += "[Date: " + GetDateString(CurrentWorld.CurrentDate) + "] - ";
+            worldInfoStr += $"[Date: {CurrentWorld.CurrentDate}] - ";
         }
 
+        logString = logString.Replace("\n", "\n\t");
         _debugLogStream.WriteLine(worldInfoStr + logString);
 
         if (type == LogType.Exception)
@@ -641,21 +761,18 @@ public class Manager
             stackTrace = stackTrace.Replace("\r\n", "\n").Replace("\n\r", "\n").Replace("\r", "\n").Replace("\n", "\n\t");
             _debugLogStream.WriteLine("\t" + stackTrace);
         }
-        
+
         _debugLogStream.Flush();
     }
 
-    /// <summary>Flags the log to be backed up.</summary>
     public static void EnableLogBackup()
     {
         _backupDebugLog = true;
     }
 
-    /// <summary>Initializes the save path.</summary>
-    /// <remarks>Will create the directory if it does not already exist.</remarks>
-    private static void InitializeSavePath()
+    private void InitializeSavePath()
     {
-        string path = Path.GetFullPath(@"Saves\");
+        string path = Path.GetFullPath(@"Saves");
 
         if (!Directory.Exists(path))
         {
@@ -665,11 +782,9 @@ public class Manager
         SavePath = path;
     }
 
-    /// <summary>Initializes the heightmaps path.</summary>
-    /// <remarks>Will create the directory if it does not already exist.</remarks>
-    private static void InitializeHeightmapsPath()
+    private void InitializeHeightmapsPath()
     {
-        string path = Path.GetFullPath(@"Heightmaps\");
+        string path = Path.GetFullPath(@"Heightmaps");
 
         if (!Directory.Exists(path))
         {
@@ -679,11 +794,9 @@ public class Manager
         HeightmapsPath = path;
     }
 
-    /// <summary>Initializes the export image path.</summary>
-    /// <remarks>Will create the directory if it does not already exist.</remarks>
-    private static void InitializeExportPath()
+    private void InitializeExportPath()
     {
-        string path = Path.GetFullPath(@"Images\");
+        string path = Path.GetFullPath(@"Images");
 
         if (!Directory.Exists(path))
         {
@@ -693,24 +806,19 @@ public class Manager
         ExportPath = path;
     }
 
-    /// <summary>Generates a string representation of the date based on its numeric form.</summary>
-    /// <param name="date">The date in numeric form.</param>
-    /// <returns>
-    ///   A string representation of the date.
-    /// </returns>
     public static string GetDateString(long date)
     {
+        if (date < 0)
+        {
+            return "Unknown";
+        }
+
         long year = date / World.YearLength;
         int day = (int)(date % World.YearLength);
 
         return string.Format("Year {0}, Day {1}", year, day);
     }
 
-    /// <summary>Generates a string representation of the timespan based on its numeric form.</summary>
-    /// <param name="timespan">The timespan in numeric form.</param>
-    /// <returns>
-    ///   A string representation of the timespan.
-    /// </returns>
     public static string GetTimeSpanString(long timespan)
     {
         long years = timespan / World.YearLength;
@@ -719,12 +827,12 @@ public class Manager
         return string.Format("{0} years, {1} days", years, days);
     }
 
-    /// <summary>Adds the current date to the world name.</summary>
-    /// <param name="worldName">Name of the world.</param>
-    /// <returns>
-    ///   The world name appended by the current date.
-    /// </returns>
-    public static string AddDateToWorldName (string worldName)
+    public static long GetDateNumber(long years, int days)
+    {
+        return years * World.YearLength + days;
+    }
+
+    public static string AddDateToWorldName(string worldName)
     {
         long year = CurrentWorld.CurrentDate / World.YearLength;
         int day = (int)(CurrentWorld.CurrentDate % World.YearLength);
@@ -732,14 +840,9 @@ public class Manager
         return worldName + "_date_" + string.Format("{0}_{1}", year, day);
     }
 
-    /// <summary>Removes the date, if present, from the world name.</summary>
-    /// <param name="worldName">Name of the world with possible appended date.</param>
-    /// <returns>
-    ///   The world name.
-    /// </returns>
     public static string RemoveDateFromWorldName(string worldName)
     {
-        int dateIndex = worldName.LastIndexOf("_date_");
+        int dateIndex = worldName.LastIndexOf("_date_", System.StringComparison.Ordinal);
 
         if (dateIndex > 0)
         {
@@ -749,8 +852,6 @@ public class Manager
         return worldName;
     }
 
-    /// <summary>Sets the game to fullscreen or windowed mode based on <c>state</c>.</summary>
-    /// <param name="state">If set to <c>true</c>, makes the game go fullscreen.</param>
     public static void SetFullscreen(bool state)
     {
         FullScreenEnabled = state;
@@ -759,22 +860,19 @@ public class Manager
         {
             Resolution currentResolution = Screen.currentResolution;
 
-            Screen.SetResolution(currentResolution.width, currentResolution.height, true);
+            Screen.SetResolution(currentResolution.width, currentResolution.height, state);
         }
         else
         {
-            Screen.SetResolution(_resolutionWidthWindowed, _resolutionHeightWindowed, false);
+            Screen.SetResolution(_resolutionWidthWindowed, _resolutionHeightWindowed, state);
         }
     }
 
-    /// <summary>Enables or disables UI scaling based on <c>state</c>.</summary>
-    /// <param name="state">If set to <c>true</c>, UI scaling is activated.</param>
     public static void SetUIScaling(bool state)
     {
         UIScalingEnabled = state;
     }
 
-    /// <summary>Initializes the screen altering options like fullscreen and UI scaling.</summary>
     public static void InitializeScreen()
     {
         if (_resolutionInitialized)
@@ -786,15 +884,11 @@ public class Manager
         _resolutionInitialized = true;
     }
 
-    /// <summary>Interrupts or resumes the simulation based on <c>state</c>.</summary>
-    /// <param name="state">If set to <c>true</c>, stops the simulation.</param>
     public static void InterruptSimulation(bool state)
     {
-        _manager._simulationRunning = !state;
+        SimulationRunning = !state;
     }
 
-    /// <summary>Executes a number of tasks determined by <c>count</c>.</summary>
-    /// <param name="count">The number of tasks to execute.</param>
     public static void ExecuteTasks(int count)
     {
         for (int i = 0; i < count; i++)
@@ -803,10 +897,6 @@ public class Manager
         }
     }
 
-    /// <summary>Executes the next task in the manager's task queue.</summary>
-    /// <returns>
-    ///   <c>true</c> if there is another task to execute; otherwise, <c>false</c>.
-    /// </returns>
     public static bool ExecuteNextTask()
     {
         IManagerTask task;
@@ -824,12 +914,6 @@ public class Manager
         return true;
     }
 
-    /// <summary>Enqueues the generic type task identified by <c>taskDelegate</c>.</summary>
-    /// <remarks>If the function is executed on the main thread, the <c>task</c> will be immediately executed.</remarks>
-    /// <param name="taskDelegate">The generic type task to be enqueued.</param>
-    /// <returns>
-    ///   The task that was just enqueued.
-    /// </returns>
     public static ManagerTask<T> EnqueueTask<T>(ManagerTaskDelegate<T> taskDelegate)
     {
         ManagerTask<T> task = new ManagerTask<T>(taskDelegate);
@@ -849,22 +933,11 @@ public class Manager
         return task;
     }
 
-    /// <summary>Enqueues the generic type task identified by <c>taskDelegate</c> and waits for the result.</summary>
-    /// <param name="taskDelegate">The generic type task to be enqueued.</param>
-    /// <returns>
-    ///   The generic type result of the enqueued task.
-    /// </returns>
     public static T EnqueueTaskAndWait<T>(ManagerTaskDelegate<T> taskDelegate)
     {
         return EnqueueTask(taskDelegate).Result;
     }
 
-    /// <summary>Enqueues the task identified by <c>taskDelegate</c>.</summary>
-    /// <remarks>If the function is executed on the main thread, the <c>task</c> will be immediately executed.</remarks>
-    /// <param name="taskDelegate">The task to be enqueued.</param>
-    /// <returns>
-    ///   The task that was just enqueued.
-    /// </returns>
     public static ManagerTask EnqueueTask(ManagerTaskDelegate taskDelegate)
     {
         ManagerTask task = new ManagerTask(taskDelegate);
@@ -884,91 +957,104 @@ public class Manager
         return task;
     }
 
-    /// <summary>Enqueues the task identified by <c>taskDelegate</c> and waits.</summary>
-    /// <param name="taskDelegate">The task to be enqueued.</param>
     public static void EnqueueTaskAndWait(ManagerTaskDelegate taskDelegate)
     {
         EnqueueTask(taskDelegate).Wait();
     }
 
-    /// <summary>Sets the range of colors for the biome palette.</summary>
-    /// <param name="colors">The list of colors to be set.</param>
     public static void SetBiomePalette(IEnumerable<Color> colors)
     {
         _biomePalette.Clear();
         _biomePalette.AddRange(colors);
     }
 
-    /// <summary>Sets the range of colors for the map palette.</summary>
-    /// <param name="colors">The list of colors to be set.</param>
     public static void SetMapPalette(IEnumerable<Color> colors)
     {
         _mapPalette.Clear();
         _mapPalette.AddRange(colors);
     }
 
-    /// <summary>Sets the range of colors for the overlay palette.</summary>
-    /// <param name="colors">The list of colors to be set.</param>
     public static void SetOverlayPalette(IEnumerable<Color> colors)
     {
         _overlayPalette.Clear();
         _overlayPalette.AddRange(colors);
     }
 
-    public static World CurrentWorld => _manager._currentWorld;
-
-    public static Texture2D CurrentMapTexture => _manager._currentMapTexture;
-
-    public static Texture2D CurrentMapOverlayTexture => _manager._currentMapOverlayTexture;
-
-    public static Texture2D CurrentMapActivityTexture => _manager._currentMapActivityTexture;
-
-    public static Texture2D CurrentMapOverlayShaderInfoTexture => _manager._currentMapOverlayShaderInfoTexture;
-
-    public static Texture2D PointerOverlayTexture => _manager._pointerOverlayTexture;
-
-    /// <summary>Converts a set of coordinates from the world map into a texture's UV coordinates.</summary>
-    /// <param name="mapPosition">The set of coordinates from the world map.</param>
-    /// <returns>
-    ///   UV Coodinates for a texture.
-    /// </returns>
-    public static Vector2 GetUVFromMapCoordinates(WorldPosition mapPosition)
+    public static World CurrentWorld
     {
-        return new Vector2(mapPosition.Longitude / (float)CurrentWorld.Width, mapPosition.Latitude / (float)CurrentWorld.Height);
+        get
+        {
+            return _manager._currentWorld;
+        }
     }
 
-    /// <summary>Exports the map texture to a file.</summary>
-    /// <param name="path">The export image path.</param>
-    /// <param name="uvRect">The map image texture coordinates.</param>
-    public static void ExportMapTextureToFile(string path, Rect uvRect)
+    public static Texture2D CurrentMapTexture
+    {
+        get
+        {
+            return _manager._currentMapTexture;
+        }
+    }
+
+    public static Texture2D CurrentMapOverlayTexture
+    {
+        get
+        {
+            return _manager._currentMapOverlayTexture;
+        }
+    }
+
+    public static Texture2D CurrentMapActivityTexture
+    {
+        get
+        {
+            return _manager._currentMapActivityTexture;
+        }
+    }
+
+    public static Texture2D CurrentMapOverlayShaderInfoTexture
+    {
+        get
+        {
+            return _manager._currentMapOverlayShaderInfoTexture;
+        }
+    }
+
+    public static Texture2D PointerOverlayTexture
+    {
+        get
+        {
+            return _manager._pointerOverlayTexture;
+        }
+    }
+
+    public static Vector2 GetUVFromMapCoordinates(Vector2 mapPosition)
+    {
+        return new Vector2(mapPosition.x / CurrentWorld.Width, mapPosition.y / CurrentWorld.Height);
+    }
+
+    /// <summary>Generates a texture based on the current map and overlay and exports it to an image file.</summary>
+    /// <param name="path">The target path and file to write the image to.</param>
+    /// <param name="mapScript">The map script to use to generate the texture.</param>
+    public static void ExportMapTextureToFile(string path, MapScript mapScript)
     {
         Texture2D mapTexture = _manager._currentMapTexture;
+        Texture2D overlayTexture = _manager._currentMapOverlayTexture;
         Texture2D exportTexture = null;
 
+        // Enqueue (and wait for) the operations that need to be executed in the 3D engine's main thread
         EnqueueTaskAndWait(() =>
         {
             int width = mapTexture.width;
             int height = mapTexture.height;
 
-            int xOffset = (int) Mathf.Floor(uvRect.x * width);
-
             exportTexture = new Texture2D(
-                width,
-                height,
-                mapTexture.format,
-                false);
+                    width,
+                    height,
+                    mapTexture.format,
+                    false);
 
-            for (int i = 0; i < width; i++)
-            {
-                for (int j = 0; j < height; j++)
-                {
-                    int finalX = (i + xOffset) % width; // What is this used for?
-
-                    exportTexture.SetPixel(i, j, mapTexture.GetPixel(finalX, j));
-                }
-            }
-
-            return true;
+            mapScript.RenderToTexture2D(exportTexture);
         });
 
         ManagerTask<byte[]> bytes = EnqueueTask(() => exportTexture.EncodeToPNG());
@@ -977,45 +1063,59 @@ public class Manager
 
         EnqueueTaskAndWait(() =>
         {
-            Object.Destroy(exportTexture);
+            UnityEngine.Object.Destroy(exportTexture);
             return true;
         });
     }
 
-    /// <summary>Exports the map texture to file asynchronously.</summary>
-    /// <param name="path">The export image path.</param>
-    /// <param name="uvRect">The map image texture coordinates.</param>
-    /// <param name="progressCastMethod">The progress cast method.</param>
-    public static void ExportMapTextureToFileAsync(string path, Rect uvRect, ProgressCastDelegate progressCastMethod = null)
+    /// <summary>Initializes a job to start an export map texture to image operation</summary>
+    /// <param name="path">The target path and file to write the image to.</param>
+    /// <param name="mapScript">The map script to use to generate the texture.</param>
+    /// <param name="progressCastMethod">handler for tracking the job's progress.</param>
+    public static void ExportMapTextureToFileAsync(string path, MapScript mapScript, ProgressCastDelegate progressCastMethod = null)
     {
-        _manager._simulationRunning = false;
-        _manager._performingAsyncTask = true;
-        
-        _manager._progressCastMethod = progressCastMethod ?? ((value, message, reset) => { });
+        SimulationRunning = false;
+        PerformingAsyncTask = true;
+
+        _progressCastMethod = progressCastMethod;
+
+        if (_progressCastMethod == null)
+        {
+            _progressCastMethod = (value, message, reset) => { };
+        }
 
         Debug.Log("Trying to export world map to .png file: " + Path.GetFileName(path));
 
+        // Launch the thread job that will handle the async export task
         ThreadPool.QueueUserWorkItem(state =>
         {
-            ExportMapTextureToFile(path, uvRect);
+            try
+            {
+                ExportMapTextureToFile(path, mapScript);
+            }
+            catch (System.Exception e)
+            {
+                // To display the exception on screen we need to queue a task on the rendering engine's main thread
+                // and rethrow the exception inside that task
+                EnqueueTaskAndWait(() =>
+                {
+                    throw new System.Exception("Unhandled exception in ExportMapTextureToFile with path: " + path, e);
+                });
+            }
 
-            _manager._performingAsyncTask = false;
-            _manager._simulationRunning = true;
+            PerformingAsyncTask = false;
+            SimulationRunning = true;
         });
     }
 
-    /// <summary>Generates the pointer overlay textures.</summary>
     public static void GeneratePointerOverlayTextures()
     {
         GeneratePointerOverlayTextureFromWorld(CurrentWorld);
     }
 
-    /// <summary>Generates the map textures.</summary>
-    /// <param name="doMapTexture">If set to <c>true</c>, the map texture is generated from the current world.</param>
-    /// <param name="doOverlayMapTexture">If set to <c>true</c>, all the map overlay textures are generated from the current world.</param>
     public static void GenerateTextures(bool doMapTexture, bool doOverlayMapTexture)
     {
-        if (DebugModeEnabled)
+        if (CurrentDevMode != DevMode.None)
         {
             UpdatedPixelCount = 0;
         }
@@ -1030,7 +1130,7 @@ public class Manager
             GenerateMapOverlayTextureFromWorld(CurrentWorld);
             GenerateMapActivityTextureFromWorld(CurrentWorld);
 
-            if (AnimationShadersEnabled && (PlanetOverlay == PlanetOverlay.DrainageBasins))
+            if (Manager.AnimationShadersEnabled && (PlanetOverlay == PlanetOverlay.DrainageBasins))
             {
                 GenerateMapOverlayShaderInfoTextureFromWorld(CurrentWorld);
             }
@@ -1039,12 +1139,6 @@ public class Manager
         ResetUpdatedAndHighlightedCells();
     }
 
-    /// <summary>Validates the cell update type and subtype combination.</summary>
-    /// <param name="updateType">Type of cell update.</param>
-    /// <param name="updateSubType">Subtype of cell update.</param>
-    /// <returns>
-    ///   <c>true</c> if the cell update type and subtype combination is valid; otherwise, <c>false</c>.
-    /// </returns>
     public static bool ValidUpdateTypeAndSubtype(CellUpdateType updateType, CellUpdateSubType updateSubType)
     {
         if (_displayRoutes && ((updateType & CellUpdateType.Route) != CellUpdateType.None))
@@ -1056,40 +1150,31 @@ public class Manager
         if ((_observableUpdateSubTypes & updateSubType) == CellUpdateSubType.None)
             return false;
 
-        if (_planetOverlay != PlanetOverlay.General)
-            return true;
-
-        if (((updateType & CellUpdateType.Territory) != CellUpdateType.None) &&
-            ((updateSubType & CellUpdateSubType.MembershipAndCore) != CellUpdateSubType.None))
+        if (_planetOverlay == PlanetOverlay.General)
         {
-            return true;
+            if (((updateType & CellUpdateType.Territory) != CellUpdateType.None) &&
+                ((updateSubType & CellUpdateSubType.MembershipAndCore) != CellUpdateSubType.None))
+            {
+                return true;
+            }
+            else if (((updateType & CellUpdateType.Group) != CellUpdateType.None) &&
+                ((updateSubType & CellUpdateSubType.Culture) != CellUpdateSubType.None))
+            {
+                return true;
+            }
+
+            return false;
         }
 
-        if (((updateType & CellUpdateType.Group) != CellUpdateType.None) &&
-            ((updateSubType & CellUpdateSubType.Culture) != CellUpdateSubType.None))
-        {
-            return true;
-        }
-
-        return false;
-
+        return true;
     }
 
-    /// <summary>Adds the cell to updated cells without checking its update type and subtype.</summary>
-    /// <param name="cell">The cell to be added to updated cells.</param>
-    /// <remarks>Only use this function if ValidUpdateTypeAndSubtype has already been called.</remarks>
+    // Only use this function if ValidUpdateTypeAndSubtype has already been called
     public static void AddUpdatedCell(TerrainCell cell)
     {
         UpdatedCells.Add(cell);
     }
 
-    /// <summary>Adds the cell to updated cells after checking its update type and subtype.</summary>
-    /// <param name="cell">The cell to be added to updated cells.</param>
-    /// <param name="updateType">Type of cell update.</param>
-    /// <param name="updateSubType">Subtype of cell update.</param>
-    /// <remarks>
-    ///   If <c>updateSubType</c> is <c>CellUpdateSubType.Terrain</c>, then the <c>cell</c> will also be added to updated terrain cells.
-    /// </remarks>
     public static void AddUpdatedCell(TerrainCell cell, CellUpdateType updateType, CellUpdateSubType updateSubType)
     {
         if (!ValidUpdateTypeAndSubtype(updateType, updateSubType))
@@ -1101,39 +1186,24 @@ public class Manager
         {
             TerrainUpdatedCells.Add(cell);
         }
-    }
 
-    /// <summary>Adds the cells within a polity's territory to updated cells after checking its update type and subtype.</summary>
-    /// <param name="polity">The polity whose territory's cells are to be added to updated cells.</param>
-    /// <param name="updateType">Type of cell update.</param>
-    /// <param name="updateSubType">Subtype of cell update.</param>
-    /// <remarks>
-    ///   If <c>updateSubType</c> is <c>CellUpdateSubType.Terrain</c>, then the <c>cell</c> will also be added to updated terrain cells.
-    /// </remarks>
-    public static void AddUpdatedCells(Polity polity, CellUpdateType updateType, CellUpdateSubType updateSubType)
-    {
-        if (!ValidUpdateTypeAndSubtype(updateType, updateSubType))
-            return;
-
-        UpdatedCells.UnionWith(polity.Territory.GetCells());
-
-        if ((updateSubType & CellUpdateSubType.Terrain) == CellUpdateSubType.Terrain)
+        if (CellShouldBeHighlighted(cell))
         {
-            TerrainUpdatedCells.UnionWith(polity.Territory.GetCells());
+            HighlightedCells.Add(cell);
         }
     }
 
-    /// <summary>Adds the cells within a territory to updated cells after checking its update type and subtype.</summary>
-    /// <param name="cells">The territory whose cells are to be added to updated cells.</param>
-    /// <param name="updateType">Type of cell update.</param>
-    /// <param name="updateSubType">Subtype of cell update.</param>
-    /// <remarks>
-    ///   If <c>updateSubType</c> is <c>CellUpdateSubType.Terrain</c>, then the <c>cell</c> will also be added to updated terrain cells.
-    /// </remarks>
-    public static void AddUpdatedCells(ICollection<TerrainCell> cells, CellUpdateType updateType, CellUpdateSubType updateSubType)
+    public static void AddUpdatedCells(Polity polity, CellUpdateType updateType, CellUpdateSubType updateSubType)
+    {
+        AddUpdatedCells(polity.Territory, updateType, updateSubType);
+    }
+
+    public static void AddUpdatedCells(Territory territory, CellUpdateType updateType, CellUpdateSubType updateSubType)
     {
         if (!ValidUpdateTypeAndSubtype(updateType, updateSubType))
             return;
+
+        ICollection<TerrainCell> cells = territory.GetCells();
 
         UpdatedCells.UnionWith(cells);
 
@@ -1141,71 +1211,189 @@ public class Manager
         {
             TerrainUpdatedCells.UnionWith(cells);
         }
+
+        if (TerritoryShouldBeHighlighted(territory))
+        {
+            HighlightedCells.UnionWith(cells);
+        }
     }
 
-    /// <summary>Adds the cell to highlighed cells.</summary>
-    /// <param name="cell">The cell to be added to highlighed cells.</param>
-    /// <param name="updateType">Type of cell update.</param>
-    public static void AddHighlightedCell(TerrainCell cell, CellUpdateType updateType)
+    public static void AddUpdatedCells(Region region, CellUpdateType updateType, CellUpdateSubType updateSubType)
     {
-        HighlightedCells.Add(cell);
+        if (!ValidUpdateTypeAndSubtype(updateType, updateSubType))
+            return;
+
+        ICollection<TerrainCell> cells = region.GetCells();
+
+        UpdatedCells.UnionWith(cells);
+
+        if ((updateSubType & CellUpdateSubType.Terrain) == CellUpdateSubType.Terrain)
+        {
+            TerrainUpdatedCells.UnionWith(cells);
+        }
+
+        if (RegionShouldBeHighlighted(region))
+        {
+            HighlightedCells.UnionWith(cells);
+        }
     }
 
-    /// <summary>Adds the cells within a territory to highlighed cells.</summary>
-    /// <param name="cells">The territory whose cells are to be added to highlighed cells.</param>
-    /// <param name="updateType">Type of cell update.</param>
-    public static void AddHighlightedCells(ICollection<TerrainCell> cells, CellUpdateType updateType)
+    /// <summary>
+    /// Adds a cell that has just been selected to the list of cells to highlight on the map
+    /// </summary>
+    /// <param name="cell">the selected cell</param>
+    private static void AddSelectedCellToHighlight(
+        TerrainCell cell)
     {
-        foreach (TerrainCell cell in cells)
+        if ((_highlightMode & HighlightMode.OnSelectedCell) == HighlightMode.OnSelectedCell)
+        {
             HighlightedCells.Add(cell);
+
+            // Add to updated cells to make sure that it gets displayed correctly
+            UpdatedCells.Add(cell);
+        }
     }
 
-    /// <summary>Generates one random human group with an initial population.</summary>
-    /// <param name="initialPopulation">The initial population.</param>
+    /// <summary>
+    /// Adds a cell that has just been hovered to the list of cells to highlight on the map
+    /// </summary>
+    /// <param name="cell">the hovered cell</param>
+    private static void AddHoveredCellToHighlight(
+        TerrainCell cell)
+    {
+        if ((_highlightMode & HighlightMode.OnHoveredCell) == HighlightMode.OnHoveredCell)
+        {
+            HighlightedCells.Add(cell);
+
+            // Add to updated cells to make sure that it gets displayed correctly
+            UpdatedCells.Add(cell);
+        }
+    }
+
+    /// <summary>
+    /// Adds a collection of cells that have just been selected to the list of cells to
+    /// highlight on the map
+    /// </summary>
+    /// <param name="cellsGetter">the cell collection getter</param>
+    private static void AddSelectedCellsToHighlight(
+        ICellSet cellsGetter)
+    {
+        if ((_highlightMode & HighlightMode.OnSelectedCollection) != HighlightMode.OnSelectedCollection)
+            return;
+
+        bool passedFilter = _filterHighlightCollection?.Invoke(cellsGetter) ?? true;
+
+        if (!passedFilter)
+            return;
+
+        ICollection<TerrainCell> cells = cellsGetter.GetCells();
+
+        HighlightedCells.UnionWith(cells);
+
+        // Add to updated cells to make sure that it gets displayed correctly
+        UpdatedCells.UnionWith(cells);
+    }
+
+    /// <summary>
+    /// Adds a collection of cells that have just been hovered to the list of cells to
+    /// highlight on the map
+    /// </summary>
+    /// <param name="cellsGetter">the cell collection getter</param>
+    private static void AddHoveredCellsToHighlight(
+        ICellSet cellsGetter)
+    {
+        if ((_highlightMode & HighlightMode.OnHoveredCollection) != HighlightMode.OnHoveredCollection)
+            return;
+
+        bool passedFilter = _filterHighlightCollection?.Invoke(cellsGetter) ?? true;
+
+        if (!passedFilter)
+            return;
+
+        ICollection<TerrainCell> cells = cellsGetter.GetCells();
+
+        HighlightedCells.UnionWith(cells);
+
+        // Add to updated cells to make sure that it gets displayed correctly
+        UpdatedCells.UnionWith(cells);
+    }
+
+    public static bool CanAddPopulationGroupAtPosition(int longitude, int latitude)
+    {
+        if ((longitude < 0) || (longitude >= CurrentWorld.Width))
+            return false;
+
+        if ((latitude < 0) || (latitude >= CurrentWorld.Height))
+            return false;
+
+        TerrainCell cell = CurrentWorld.GetCell(longitude, latitude);
+
+        if (cell.IsLiquidSea || cell.Survivability < World.MinSurvivabilityForUserGroupPlacement)
+            return false;
+
+        return true;
+    }
+
     public static void GenerateRandomHumanGroup(int initialPopulation)
     {
         World world = _manager._currentWorld;
 
-        world.ProgressCastMethod = _manager._progressCastMethod ?? ((value, message, reset) => { });
+        if (_progressCastMethod == null)
+        {
+            world.ProgressCastMethod = (value, message, reset) => { };
+        }
+        else
+        {
+            world.ProgressCastMethod = _progressCastMethod;
+        }
 
         world.GenerateRandomHumanGroups(1, initialPopulation);
     }
 
-    /// <summary>Generates a human group with an initial population at a specific set of coordinates.</summary>
-    /// <param name="longitude">The longitude.</param>
-    /// <param name="latitude">The latitude.</param>
-    /// <param name="initialPopulation">The initial population.</param>
     public static void GenerateHumanGroup(int longitude, int latitude, int initialPopulation)
     {
         World world = _manager._currentWorld;
 
-        world.ProgressCastMethod = _manager._progressCastMethod ?? ((value, message, reset) => { });
+        if (_progressCastMethod == null)
+        {
+            world.ProgressCastMethod = (value, message, reset) => { };
+        }
+        else
+        {
+            world.ProgressCastMethod = _progressCastMethod;
+        }
 
         world.GenerateHumanGroup(longitude, latitude, initialPopulation);
     }
 
-    /// <summary>Sets the current active mod paths.</summary>
-    /// <param name="paths">The collection containing all the activated mod paths.</param>
-    /// <remarks>Will clear the old list of active mod paths.</remarks>
     public static void SetActiveModPaths(ICollection<string> paths)
     {
         ActiveModPaths.Clear();
-        ActiveModPaths.AddRange(paths);
-        ActiveModPaths.Sort();
+
+        foreach (string path in paths)
+        {
+            // Make sure mod paths are always parseable regardless of system
+            string[] splitPath = path.Split('/', '\\');
+            ActiveModPaths.Add(Path.Combine(splitPath));
+        }
+
+        ActiveModPaths.Sort(System.StringComparer.Ordinal); // order mods alphabetically before load
 
         ModsAlreadyLoaded = false;
     }
 
-    /// <summary>Generates a new world.</summary>
-    /// <param name="seed">The seed used to set the random number generator state.</param>
-    /// <param name="heightmap">The heightmap to generate the world from if present.</param>
     public static void GenerateNewWorld(int seed, Texture2D heightmap)
     {
-        _manager._worldReady = false;
+        WorldIsReady = false;
 
         LastStageProgress = 0;
 
-        ProgressCastDelegate progressCastMethod = _manager._progressCastMethod ?? ((value, message, reset) => { });
+        ProgressCastDelegate progressCastMethod;
+
+        if (_progressCastMethod == null)
+            progressCastMethod = (value, message, reset) => { };
+        else
+            progressCastMethod = _progressCastMethod;
 
         TryLoadActiveMods();
 
@@ -1224,26 +1412,33 @@ public class Manager
 
         _manager._currentWorld = world;
         _manager._currentCellSlants = new float?[world.Width, world.Height];
-        _manager._currentMaxUpdateSpan = 0;
 
-        _manager._worldReady = true;
+        CurrentMaxUpdateSpan = 0;
+        CurrentMaxAdminCost = 0;
+
+        WorldIsReady = true;
 
         ForceWorldCleanup();
     }
 
-    /// <summary>Generates a new world asynchronously.</summary>
-    /// <param name="seed">The seed used to set the random number generator state.</param>
-    /// <param name="heightmap">The heightmap to generate the world from if present.</param>
-    /// <param name="progressCastMethod">The progress cast method.</param>
     public static void GenerateNewWorldAsync(int seed, Texture2D heightmap = null, ProgressCastDelegate progressCastMethod = null)
     {
-        _manager._simulationRunning = false;
-        _manager._performingAsyncTask = true;
+        SimulationRunning = false;
+        PerformingAsyncTask = true;
 
-        _manager._progressCastMethod = progressCastMethod ?? ((value, message, reset) => { });
+        _progressCastMethod = progressCastMethod;
+
+        if (_progressCastMethod == null)
+        {
+            _progressCastMethod = (value, message, reset) => { };
+        }
 
         Debug.Log(string.Format("Trying to generate world with seed: {0}, Altitude Scale: {1}, Sea Level Offset: {2}, River Strength: {3}, Avg. Temperature: {4}, Avg. Rainfall: {5}",
             seed, AltitudeScale, SeaLevelOffset, RiverStrength, TemperatureOffset, RainfallOffset));
+
+        string activeModStrs = string.Join(",", ActiveModPaths);
+
+        Debug.Log("Active Mods: " + activeModStrs);
 
         ThreadPool.QueueUserWorkItem(state =>
         {
@@ -1259,42 +1454,56 @@ public class Manager
                 });
             }
 
-            _manager._performingAsyncTask = false;
-            _manager._simulationRunning = true;
+            PerformingAsyncTask = false;
+            SimulationRunning = true;
         });
     }
 
-    /// <summary>Regenerates one type of the generation in the world.</summary>
-    /// <param name="type">The type to be regenerated; i.e., terrain, temperature, rain, etc.</param>
+    public static void ResetWorld()
+    {
+        CurrentWorld.ResetWorld();
+    }
+
     public static void RegenerateWorld(GenerationType type)
     {
-        _manager._worldReady = false;
+        WorldIsReady = false;
 
         World world = _manager._currentWorld;
 
-        world.ProgressCastMethod = _manager._progressCastMethod ?? ((value, message, reset) => { });
+        if (_progressCastMethod == null)
+        {
+            world.ProgressCastMethod = (value, message, reset) => { };
+        }
+        else
+        {
+            world.ProgressCastMethod = _progressCastMethod;
+        }
 
         world.StartReinitialization(0f, 1.0f);
         world.Regenerate(type);
         world.FinishInitialization();
-        
-        _manager._currentCellSlants = new float?[world.Width, world.Height];
-        _manager._currentMaxUpdateSpan = 0;
 
-        _manager._worldReady = true;
+        _manager._currentCellSlants = new float?[world.Width, world.Height];
+
+        CurrentMaxUpdateSpan = 0;
+        CurrentMaxAdminCost = 0;
+
+        WorldIsReady = true;
 
         ForceWorldCleanup();
     }
 
-    /// <summary>Regenerates one type of the generation in the world asynchronous.</summary>
-    /// <param name="type">The type to be regenerated; i.e., terrain, temperature, rain, etc.</param>
-    /// <param name="progressCastMethod">The progress cast method.</param>
     public static void RegenerateWorldAsync(GenerationType type, ProgressCastDelegate progressCastMethod = null)
     {
-        _manager._simulationRunning = false;
-        _manager._performingAsyncTask = true;
+        SimulationRunning = false;
+        PerformingAsyncTask = true;
 
-        _manager._progressCastMethod = progressCastMethod ?? ((value, message, reset) => { });
+        _progressCastMethod = progressCastMethod;
+
+        if (_progressCastMethod == null)
+        {
+            _progressCastMethod = (value, message, reset) => { };
+        }
 
         Debug.Log(string.Format("Trying to regenerate world with seed: {0}, Altitude Scale: {1}, Sea Level Offset: {2}, River Strength: {3}, Avg. Temperature: {4}, Avg. Rainfall: {5}",
             _manager._currentWorld.Seed, AltitudeScale, SeaLevelOffset, RiverStrength, TemperatureOffset, RainfallOffset));
@@ -1313,13 +1522,11 @@ public class Manager
                 });
             }
 
-            _manager._performingAsyncTask = false;
-            _manager._simulationRunning = true;
+            PerformingAsyncTask = false;
+            SimulationRunning = true;
         });
     }
 
-    /// <summary>Saves the game's settings to a file specified by <c>path</c>.</summary>
-    /// <param name="path">The path to be saved to.</param>
     public static void SaveAppSettings(string path)
     {
         AppSettings settings = new AppSettings();
@@ -1334,8 +1541,6 @@ public class Manager
         }
     }
 
-    /// <summary>Loads the game's settings from a file specified by <c>path</c>.</summary>
-    /// <param name="path">The path to be loaded from.</param>
     public static void LoadAppSettings(string path)
     {
         if (!File.Exists(path))
@@ -1347,14 +1552,12 @@ public class Manager
 
         using (FileStream stream = new FileStream(path, FileMode.Open))
         {
-            if (serializer.Deserialize(stream) is AppSettings settings)
-                settings.Take();
+            AppSettings settings = serializer.Deserialize(stream) as AppSettings;
+
+            settings.Take();
         }
     }
 
-
-    /// <summary>Saves the world to a file specified by <c>path</c>.</summary>
-    /// <param name="path">The path to be saved to.</param>
     public static void SaveWorld(string path)
     {
         _manager._currentWorld.Synchronize();
@@ -1367,15 +1570,17 @@ public class Manager
         }
     }
 
-    /// <summary>Saves the world to a file specified by <c>path</c> asynchronously.</summary>
-    /// <param name="path">The path to be saved to.</param>
-    /// <param name="progressCastMethod">The progress cast method.</param>
     public static void SaveWorldAsync(string path, ProgressCastDelegate progressCastMethod = null)
     {
-        _manager._simulationRunning = false;
-        _manager._performingAsyncTask = true;
+        SimulationRunning = false;
+        PerformingAsyncTask = true;
 
-        _manager._progressCastMethod = progressCastMethod ?? ((value, message, reset) => { });
+        _progressCastMethod = progressCastMethod;
+
+        if (_progressCastMethod == null)
+        {
+            _progressCastMethod = (value, message, reset) => { };
+        }
 
         Debug.Log("Trying to save world to file: " + Path.GetFileName(path));
 
@@ -1393,54 +1598,60 @@ public class Manager
                 });
             }
 
-            _manager._performingAsyncTask = false;
-            _manager._simulationRunning = true;
+            PerformingAsyncTask = false;
+            SimulationRunning = true;
         });
     }
 
-    /// <summary>Forces the world to be cleaned up.</summary>
-    /// <para>
-    ///   NOTE: Make sure there are no outside references to the world object stored in _manager._currentWorld, otherwise it is pointless to call this...
-    ///   WARNING: Don't abuse this function call.
-    /// </para>
+    // NOTE: Make sure there are no outside references to the world object stored in _manager._currentWorld, otherwise it is pointless to call this...
+    // WARNING: Don't abuse this function call.
     private static void ForceWorldCleanup()
     {
         System.GC.Collect();
         System.GC.WaitForPendingFinalizers();
     }
 
-    /// <summary>Tries to load active mods.</summary>
     private static void TryLoadActiveMods()
     {
-        if (ModsAlreadyLoaded)
-            return;
-
-        LoadMods(ActiveModPaths);
-        ModsAlreadyLoaded = true;
+        if (!ModsAlreadyLoaded)
+        {
+            LoadMods(ActiveModPaths);
+            ModsAlreadyLoaded = true;
+        }
     }
 
-    /// <summary>Loads the world from a file specified by <c>path</c>.</summary>
-    /// <param name="path">The path to be loaded from.</param>
     public static void LoadWorld(string path)
     {
-        _manager._worldReady = false;
+        WorldIsReady = false;
 
         LastStageProgress = 0;
 
-        ProgressCastDelegate progressCastMethod = _manager._progressCastMethod ?? ((value, message, reset) => { });
+        ProgressCastDelegate progressCastMethod;
+
+        if (_progressCastMethod == null)
+            progressCastMethod = (value, message, reset) => { };
+        else
+            progressCastMethod = _progressCastMethod;
 
         ResetWorldLoadTrack();
-        
+
         World world;
 
         XmlSerializer serializer = new XmlSerializer(typeof(World), _manager.AttributeOverrides);
-        
+
         using (FileStream stream = new FileStream(path, FileMode.Open))
         {
             world = serializer.Deserialize(stream) as World;
         }
 
-        world.ProgressCastMethod = _manager._progressCastMethod ?? ((value, message, reset) => { });
+        if (_progressCastMethod == null)
+        {
+            world.ProgressCastMethod = (value, message, reset) => { };
+        }
+        else
+        {
+            world.ProgressCastMethod = _progressCastMethod;
+        }
 
         LastStageProgress = StageProgressIncFromLoading;
 
@@ -1465,73 +1676,69 @@ public class Manager
 
         progressCastMethod(progressBeforeFinalizing, "Finalizing...");
 
-        world.FinalizeLoad(progressBeforeFinalizing, 1.0f, _manager._progressCastMethod);
+        world.FinalizeLoad(progressBeforeFinalizing, 1.0f, _progressCastMethod);
 
         _manager._currentWorld = world;
         _manager._currentCellSlants = new float?[world.Width, world.Height];
-        _manager._currentMaxUpdateSpan = 0;
+
+        CurrentMaxUpdateSpan = 0;
+        CurrentMaxAdminCost = 0;
 
         WorldBeingLoaded = null;
 
-        _manager._worldReady = true;
+        WorldIsReady = true;
 
         ForceWorldCleanup();
     }
 
-    /// <summary>Loads the world from a file specified by <c>path</c> asynchronously.</summary>
-    /// <param name="path">The path to be loaded from.</param>
-    /// <param name="progressCastMethod">The progress cast method.</param>
+    /// <summary>Initializes a job to start loading a world save file.</summary>
+    /// <param name="path">The target path and file to load the world from.</param>
+    /// <param name="progressCastMethod">handler for tracking the job's progress.</param>
     public static void LoadWorldAsync(string path, ProgressCastDelegate progressCastMethod = null)
     {
 #if DEBUG
         Debug_IsLoadedWorld = true;
 #endif
 
-        _manager._simulationRunning = false;
-        _manager._performingAsyncTask = true;
+        SimulationRunning = false;
+        PerformingAsyncTask = true;
 
-        _manager._progressCastMethod = progressCastMethod ?? ((value, message, reset) => { });
+        _progressCastMethod = progressCastMethod;
+
+        if (_progressCastMethod == null)
+        {
+            _progressCastMethod = (value, message, reset) => { };
+        }
 
         Debug.Log("Trying to load world from file: " + Path.GetFileName(path));
 
+        // Launch the thread job that will handle the async load task
         ThreadPool.QueueUserWorkItem(state =>
         {
             try
             {
                 LoadWorld(path);
             }
-            //catch (IOException e)
-            //{
-            //    // DEBUG: This is a workaround. We shouldn't ignore file sharing violations
-            //    if (System.Runtime.InteropServices.Marshal.GetHRForException(e) != 0x00000020)
-            //    {
-            //        EnqueueTaskAndWait(() =>
-            //        {
-            //            throw new System.Exception("Unhandled exception in LoadWorld with path: " + path, e);
-            //        });
-            //    }
-            //}
             catch (System.Exception e)
             {
+                // To display the exception on screen we need to queue a task on the rendering engine's main thread
+                // and rethrow the exception inside that task
                 EnqueueTaskAndWait(() =>
                 {
                     throw new System.Exception("Unhandled exception in LoadWorld with path: " + path, e);
                 });
             }
 
-            _manager._performingAsyncTask = false;
-            _manager._simulationRunning = true;
+            PerformingAsyncTask = false;
+            SimulationRunning = true;
         });
     }
 
-    /// <summary>Resets the world load progress value.</summary>
     public static void ResetWorldLoadTrack()
     {
         _isLoadReady = false;
     }
 
-
-    /// <summary>Initializes the world load progress value.</summary>
     public static void InitializeWorldLoadTrack()
     {
         _isLoadReady = true;
@@ -1543,7 +1750,6 @@ public class Manager
         _loadTicks = 0;
     }
 
-    /// <summary>Updates the world load progress value.</summary>
     public static void UpdateWorldLoadTrackEventCount()
     {
         if (!_isLoadReady)
@@ -1551,117 +1757,241 @@ public class Manager
 
         _loadTicks += 1;
 
-        float value = LastStageProgress + (StageProgressIncFromLoading * _loadTicks / _totalLoadTicks);
+        float value = LastStageProgress + (StageProgressIncFromLoading * _loadTicks / (float)_totalLoadTicks);
 
-        _manager._progressCastMethod?.Invoke(Mathf.Min(1, value));
+        _progressCastMethod?.Invoke(Mathf.Min(1, value));
     }
 
-    /// <summary>Sets the observable update types based on the current displayed overlay.</summary>
-    /// <param name="overlay">The current displayed overlay.</param>
-    /// <param name="planetOverlaySubtype">The current displayed overlay subtype.</param>
-    private static void SetObservableUpdateTypes(PlanetOverlay overlay, string planetOverlaySubtype = "None")
+    private static void SetObservableUpdateTypes(PlanetOverlay overlay, string planetOverlaySubtype = NoOverlaySubtype)
     {
-        switch (overlay)
+        if ((overlay == PlanetOverlay.None) ||
+            (overlay == PlanetOverlay.Arability) ||
+            (overlay == PlanetOverlay.Accessibility) ||
+            (overlay == PlanetOverlay.Hilliness) ||
+            (overlay == PlanetOverlay.BiomeTrait) ||
+            (overlay == PlanetOverlay.Layer) ||
+            (overlay == PlanetOverlay.Rainfall) ||
+            (overlay == PlanetOverlay.DrainageBasins) ||
+            (overlay == PlanetOverlay.Temperature) ||
+            (overlay == PlanetOverlay.FarmlandDistribution) ||
+            (overlay == PlanetOverlay.CellSelection))
         {
-            case PlanetOverlay.None:
-            case PlanetOverlay.Arability:
-            case PlanetOverlay.Accessibility:
-            case PlanetOverlay.Hilliness:
-            case PlanetOverlay.BiomeTrait:
-            case PlanetOverlay.Layer:
-            case PlanetOverlay.Rainfall:
-            case PlanetOverlay.DrainageBasins:
-            case PlanetOverlay.Temperature:
-            case PlanetOverlay.FarmlandDistribution:
-                _observableUpdateTypes = CellUpdateType.Cell;
-                break;
-            case PlanetOverlay.Region:
-                _observableUpdateTypes = CellUpdateType.Region;
-                break;
-            case PlanetOverlay.PolityCluster:
-                _observableUpdateTypes = CellUpdateType.Cluster;
-                break;
-            case PlanetOverlay.Language:
-                _observableUpdateTypes = CellUpdateType.Language;
-                break;
-            case PlanetOverlay.PolityTerritory:
-            case PlanetOverlay.PolityContacts:
-            case PlanetOverlay.PolityCulturalPreference:
-            case PlanetOverlay.PolityCulturalActivity:
-            case PlanetOverlay.PolityCulturalDiscovery:
-            case PlanetOverlay.PolityCulturalKnowledge:
-            case PlanetOverlay.PolityCulturalSkill:
-                _observableUpdateTypes = CellUpdateType.Territory;
-                break;
-            case PlanetOverlay.General:
-                _observableUpdateTypes = CellUpdateType.Group | CellUpdateType.Territory;
-                break;
-            default:
-                _observableUpdateTypes = CellUpdateType.Group;
-                break;
+            _observableUpdateTypes = CellUpdateType.Cell;
+        }
+        else if (
+            (overlay == PlanetOverlay.Region) ||
+            (overlay == PlanetOverlay.RegionSelection))
+        {
+            _observableUpdateTypes = CellUpdateType.Region;
+        }
+        else if ((overlay == PlanetOverlay.PolityCluster) ||
+            (overlay == PlanetOverlay.ClusterAdminCost))
+        {
+            _observableUpdateTypes = CellUpdateType.Cluster;
+        }
+        else if (overlay == PlanetOverlay.Language)
+        {
+            _observableUpdateTypes = CellUpdateType.Language;
+        }
+        else if ((overlay == PlanetOverlay.PolityTerritory) ||
+            (overlay == PlanetOverlay.PolityContacts) ||
+            (overlay == PlanetOverlay.PolityCoreRegions) ||
+            (overlay == PlanetOverlay.PolityCulturalPreference) ||
+            (overlay == PlanetOverlay.PolityCulturalActivity) ||
+            (overlay == PlanetOverlay.PolityCulturalDiscovery) ||
+            (overlay == PlanetOverlay.PolityCulturalKnowledge) ||
+            (overlay == PlanetOverlay.PolityCulturalSkill) ||
+            (overlay == PlanetOverlay.PolityAdminCost) ||
+            (overlay == PlanetOverlay.PolitySelection) ||
+            (overlay == PlanetOverlay.FactionSelection))
+        {
+            _observableUpdateTypes = CellUpdateType.Territory;
+        }
+        else if (overlay == PlanetOverlay.General)
+        {
+            _observableUpdateTypes = CellUpdateType.Group | CellUpdateType.Territory;
+        }
+        else
+        {
+            _observableUpdateTypes = CellUpdateType.Group;
         }
     }
 
-    /// <summary>Sets the observable update subtypes based on the current displayed overlay.</summary>
-    /// <param name="overlay">The current displayed overlay.</param>
-    /// <param name="planetOverlaySubtype">The current displayed overlay subtype.</param>
-    private static void SetObservableUpdateSubtypes(PlanetOverlay overlay, string planetOverlaySubtype = "None")
+    private static void SetObservableUpdateSubtypes(PlanetOverlay overlay, string planetOverlaySubtype = NoOverlaySubtype)
     {
-        switch (overlay)
+        if ((overlay == PlanetOverlay.None) ||
+            (overlay == PlanetOverlay.Arability) ||
+            (overlay == PlanetOverlay.Accessibility) ||
+            (overlay == PlanetOverlay.Hilliness) ||
+            (overlay == PlanetOverlay.BiomeTrait) ||
+            (overlay == PlanetOverlay.Layer) ||
+            (overlay == PlanetOverlay.Rainfall) ||
+            (overlay == PlanetOverlay.DrainageBasins) ||
+            (overlay == PlanetOverlay.Temperature) ||
+            (overlay == PlanetOverlay.FarmlandDistribution))
         {
-            case PlanetOverlay.None:
-            case PlanetOverlay.Arability:
-            case PlanetOverlay.Accessibility:
-            case PlanetOverlay.Hilliness:
-            case PlanetOverlay.BiomeTrait:
-            case PlanetOverlay.Layer:
-            case PlanetOverlay.Rainfall:
-            case PlanetOverlay.DrainageBasins:
-            case PlanetOverlay.Temperature:
-            case PlanetOverlay.FarmlandDistribution:
-                _observableUpdateSubTypes = CellUpdateSubType.Terrain;
-                break;
-            case PlanetOverlay.Region:
-            case PlanetOverlay.PolityCluster:
-            case PlanetOverlay.Language:
-                _observableUpdateSubTypes = CellUpdateSubType.Membership;
-                break;
-            case PlanetOverlay.PolityTerritory:
-                _observableUpdateSubTypes = CellUpdateSubType.MembershipAndCore;
-                break;
-            case PlanetOverlay.PolityContacts:
-                _observableUpdateSubTypes = CellUpdateSubType.Membership | CellUpdateSubType.Relationship;
-                break;
-            case PlanetOverlay.General:
-                _observableUpdateSubTypes = CellUpdateSubType.MembershipAndCore | CellUpdateSubType.Culture;
-                break;
-            case PlanetOverlay.PolityCulturalPreference:
-            case PlanetOverlay.PolityCulturalActivity:
-            case PlanetOverlay.PolityCulturalDiscovery:
-            case PlanetOverlay.PolityCulturalKnowledge:
-            case PlanetOverlay.PolityCulturalSkill:
-                _observableUpdateSubTypes = CellUpdateSubType.Membership | CellUpdateSubType.Culture;
-                break;
-            default:
-                _observableUpdateSubTypes = CellUpdateSubType.All;
-                break;
+            _observableUpdateSubTypes = CellUpdateSubType.Terrain;
+        }
+        else if (
+            (overlay == PlanetOverlay.Region) ||
+            (overlay == PlanetOverlay.PolityCoreRegions) ||
+            (overlay == PlanetOverlay.RegionSelection) ||
+            (overlay == PlanetOverlay.PolityCluster) ||
+            (overlay == PlanetOverlay.Language))
+        {
+            _observableUpdateSubTypes = CellUpdateSubType.Membership;
+        }
+        else if (overlay == PlanetOverlay.PolityTerritory)
+        {
+            _observableUpdateSubTypes = CellUpdateSubType.MembershipAndCore;
+        }
+        else if (overlay == PlanetOverlay.FactionCoreDistance)
+        {
+            _observableUpdateSubTypes = CellUpdateSubType.Membership | CellUpdateSubType.CoreDistance;
+        }
+        else if (
+            (overlay == PlanetOverlay.PolityContacts) ||
+            (overlay == PlanetOverlay.PolitySelection))
+        {
+            _observableUpdateSubTypes = CellUpdateSubType.Membership | CellUpdateSubType.Relationship;
+        }
+        else if (overlay == PlanetOverlay.General)
+        {
+            _observableUpdateSubTypes = CellUpdateSubType.MembershipAndCore | CellUpdateSubType.Culture;
+        }
+        else if ((overlay == PlanetOverlay.PolityCulturalPreference) ||
+            (overlay == PlanetOverlay.PolityCulturalActivity) ||
+            (overlay == PlanetOverlay.PolityCulturalDiscovery) ||
+            (overlay == PlanetOverlay.PolityCulturalKnowledge) ||
+            (overlay == PlanetOverlay.PolityCulturalSkill))
+        {
+            _observableUpdateSubTypes = CellUpdateSubType.Membership | CellUpdateSubType.Culture;
+        }
+        else
+        {
+            _observableUpdateSubTypes = CellUpdateSubType.All;
         }
     }
 
-    /// <summary>Sets the current displayed planet overlay.</summary>
-    /// <param name="overlay">The overlay to be displayed.</param>
-    /// <param name="planetOverlaySubtype">The overlay subtype to be displayed.</param>
+    private static bool FilterSelectableRegion(ICellSet getter)
+    {
+        if ((getter is Region region) &&
+            (region.SelectionFilterType == Region.FilterType.Selectable))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool FilterSelectableTerritory(ICellSet getter)
+    {
+        if ((getter is Territory territory) &&
+            (territory.SelectionFilterType == Territory.FilterType.Selectable))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool FilterSelectableFaction(ICellSet getter)
+    {
+        if ((getter is Faction faction) &&
+            (faction.SelectionFilterType == Faction.FilterType.Selectable))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static void SetOverlayHighlightMode(PlanetOverlay overlay)
+    {
+        _filterHighlightCollection = null;
+
+        if (overlay == PlanetOverlay.RegionSelection)
+        {
+            _highlightMode = HighlightMode.OnHoveredCollection;
+            _filterHighlightCollection = FilterSelectableRegion;
+        }
+        else if (overlay == PlanetOverlay.PolitySelection)
+        {
+            _highlightMode = HighlightMode.OnHoveredCollection;
+            _filterHighlightCollection = FilterSelectableTerritory;
+        }
+        else if (overlay == PlanetOverlay.FactionSelection)
+        {
+            _highlightMode = HighlightMode.OnHoveredCollection;
+            _filterHighlightCollection = FilterSelectableFaction;
+        }
+        else if (overlay == PlanetOverlay.CellSelection)
+        {
+            _highlightMode = HighlightMode.OnHoveredCell;
+        }
+        else if ((overlay == PlanetOverlay.PolityContacts) ||
+            (overlay == PlanetOverlay.PolityCoreRegions))
+        {
+            _highlightMode = HighlightMode.OnSelectedCell;
+        }
+        else
+        {
+            _highlightMode = HighlightMode.OnSelected;
+        }
+    }
+
+    public static void AddedCoreRegion(Polity polity, Region region)
+    {
+        if ((_planetOverlay == PlanetOverlay.PolityCoreRegions) &&
+            (CurrentWorld.SelectedTerritory == polity.Territory))
+        {
+            UpdatedCells.UnionWith(region.GetCells());
+            region.SelectionFilterType = Region.FilterType.Core;
+        }
+    }
+
+    public static void RemovedCoreRegion(Polity polity, Region region)
+    {
+        if ((_planetOverlay == PlanetOverlay.PolityCoreRegions) &&
+            (CurrentWorld.SelectedTerritory == polity.Territory))
+        {
+            UpdatedCells.UnionWith(region.GetCells());
+            region.SelectionFilterType = Region.FilterType.None;
+        }
+    }
+
     public static void SetPlanetOverlay(PlanetOverlay overlay, string planetOverlaySubtype = "None")
     {
+        SetOverlayHighlightMode(overlay);
+
         SetObservableUpdateTypes(overlay, planetOverlaySubtype);
         SetObservableUpdateSubtypes(overlay, planetOverlaySubtype);
+
+        if (overlay != _planetOverlay)
+        {
+            if (CurrentWorld.SelectedTerritory != null)
+            {
+                if (_planetOverlay == PlanetOverlay.PolityCoreRegions)
+                {
+                    foreach (Region region in CurrentWorld.SelectedTerritory.Polity.CoreRegions)
+                    {
+                        region.SelectionFilterType = Region.FilterType.None;
+                    }
+                }
+                else if (overlay == PlanetOverlay.PolityCoreRegions)
+                {
+                    foreach (Region region in CurrentWorld.SelectedTerritory.Polity.CoreRegions)
+                    {
+                        region.SelectionFilterType = Region.FilterType.Core;
+                    }
+                }
+            }
+        }
 
         _planetOverlay = overlay;
         _planetOverlaySubtype = planetOverlaySubtype;
     }
 
-    /// <summary>Displays routes based on <c>value</c>.</summary>
-    /// <param name="value">If set to <c>true</c>, displays routes.</param>
     public static void SetDisplayRoutes(bool value)
     {
         if (value)
@@ -1672,44 +2002,31 @@ public class Manager
         _displayRoutes = value;
     }
 
-    /// <summary>Displays group activity based on <c>value</c>.</summary>
-    /// <param name="value">If set to <c>true</c>, displays group activity.</param>
     public static void SetDisplayGroupActivity(bool value)
     {
         _displayGroupActivity = value;
     }
 
-    /// <summary>Sets the planet view to <c>value</c>.</summary>
-    /// <param name="value">The planet view to be set.</param>
     public static void SetPlanetView(PlanetView value)
     {
         _planetView = value;
     }
 
-    /// <summary>
-    ///   Sets the currently selected cell to the cell at the given <c>latitude</c> and <c>longitude</c>.
-    /// </summary>
-    /// <param name="longitude">The longitude of the cell to be set to selectd.</param>
-    /// <param name="latitude">The latitude of the cell to be set to selected.</param>
     public static void SetSelectedCell(int longitude, int latitude)
     {
         SetSelectedCell(CurrentWorld.GetCell(longitude, latitude));
     }
 
-    /// <summary>Sets the selected cell to the cell at the given <c>position</c>.</summary>
-    /// <param name="position">The world position of the cell to be set to selected.</param>
     public static void SetSelectedCell(WorldPosition position)
     {
         SetSelectedCell(CurrentWorld.GetCell(position));
     }
 
-    /// <summary>Sets the selected region to <c>region</c>.</summary>
-    /// <param name="region">The region to be set to selected.</param>
     public static void SetSelectedRegion(Region region)
     {
-        if (CurrentWorld.SelectedRegion != null) // Why add the current selected region to highlighted cells?
+        if (CurrentWorld.SelectedRegion != null)
         {
-            AddHighlightedCells(CurrentWorld.SelectedRegion.GetCells(), CellUpdateType.Region);
+            AddSelectedCellsToHighlight(CurrentWorld.SelectedRegion);
 
             CurrentWorld.SelectedRegion.IsSelected = false;
             CurrentWorld.SelectedRegion = null;
@@ -1718,121 +2035,227 @@ public class Manager
         if (region != null)
         {
             CurrentWorld.SelectedRegion = region;
-            CurrentWorld.SelectedRegion.IsSelected = true;
+            region.IsSelected = true;
 
-            AddHighlightedCells(CurrentWorld.SelectedRegion.GetCells(), CellUpdateType.Region);
+            AddSelectedCellsToHighlight(region);
         }
     }
 
-    /// <summary>Sets the selected territory to <c>territory</c>.</summary>
-    /// <param name="territory">The territory to be set to selected.</param>
+    public static void SetHoveredRegion(Region region)
+    {
+        if (CurrentWorld.HoveredRegion != null)
+        {
+            AddHoveredCellsToHighlight(CurrentWorld.HoveredRegion);
+
+            CurrentWorld.HoveredRegion.IsHovered = false;
+            CurrentWorld.HoveredRegion = null;
+        }
+
+        if (region != null)
+        {
+            CurrentWorld.HoveredRegion = region;
+            region.IsHovered = true;
+
+            AddHoveredCellsToHighlight(region);
+        }
+    }
+
+    private static void SetSelectedTerritory_HandleUpdate(Territory territory, Region.FilterType type)
+    {
+        if (_planetOverlay == PlanetOverlay.PolityContacts)
+        {
+            // Add to updated cells to make sure that it gets displayed correctly
+            UpdatedCells.UnionWith(territory.GetCells());
+
+            foreach (PolityContact contact in territory.Polity.GetContacts())
+            {
+                UpdatedCells.UnionWith(contact.NeighborPolity.Territory.GetCells());
+            }
+        }
+        else if (_planetOverlay == PlanetOverlay.PolityCoreRegions)
+        {
+            // Add to updated cells to make sure that it gets displayed correctly
+            UpdatedCells.UnionWith(territory.GetCells());
+
+            foreach (Region region in territory.Polity.CoreRegions)
+            {
+                UpdatedCells.UnionWith(region.GetCells());
+                region.SelectionFilterType = type;
+            }
+        }
+    }
+
     public static void SetSelectedTerritory(Territory territory)
     {
         if (CurrentWorld.SelectedTerritory != null)
         {
-            AddHighlightedCells(CurrentWorld.SelectedTerritory.GetCells(), CellUpdateType.Territory);
+            AddSelectedCellsToHighlight(CurrentWorld.SelectedTerritory);
 
-            Polity selectedPolity = CurrentWorld.SelectedTerritory.Polity;
+            SetSelectedTerritory_HandleUpdate(CurrentWorld.SelectedTerritory, Region.FilterType.None);
 
             CurrentWorld.SelectedTerritory.IsSelected = false;
             CurrentWorld.SelectedTerritory = null;
-
-            if (_planetOverlay == PlanetOverlay.PolityContacts)
-            {
-                foreach (PolityContact contact in selectedPolity.GetContacts())
-                {
-                    AddHighlightedCells(contact.Polity.Territory.GetCells(), CellUpdateType.Territory);
-                }
-            }
         }
 
         if (territory != null)
         {
             CurrentWorld.SelectedTerritory = territory;
-            CurrentWorld.SelectedTerritory.IsSelected = true;
+            territory.IsSelected = true;
 
-            AddHighlightedCells(CurrentWorld.SelectedTerritory.GetCells(), CellUpdateType.Territory);
+            AddSelectedCellsToHighlight(territory);
 
-            if (_planetOverlay == PlanetOverlay.PolityContacts)
+            SetSelectedTerritory_HandleUpdate(territory, Region.FilterType.Core);
+        }
+
+        if ((_planetOverlay == PlanetOverlay.PolityCluster) ||
+            (_planetOverlay == PlanetOverlay.ClusterAdminCost))
+        {
+            foreach (var polity in CurrentWorld.GetActivePolities())
             {
-                Polity selectedPolity = territory.Polity;
-
-                foreach (PolityContact contact in selectedPolity.GetContacts())
-                {
-                    AddHighlightedCells(contact.Polity.Territory.GetCells(), CellUpdateType.Territory);
-                }
+                AddSelectedCellsToHighlight(polity.Territory);
             }
         }
     }
 
-    /// <summary>Sets the selected cell to <c>cell</c>.</summary>
-    /// <param name="cell">The terrain cell to be set to selected.</param>
+    public static void SetHoveredTerritory(Territory territory)
+    {
+        if (CurrentWorld.HoveredTerritory != null)
+        {
+            AddHoveredCellsToHighlight(CurrentWorld.HoveredTerritory);
+
+            CurrentWorld.HoveredTerritory.IsHovered = false;
+            CurrentWorld.HoveredTerritory = null;
+        }
+
+        if (territory != null)
+        {
+            CurrentWorld.HoveredTerritory = territory;
+            territory.IsHovered = true;
+
+            AddHoveredCellsToHighlight(territory);
+        }
+    }
+
+    public static void SetHoveredFaction(Faction faction)
+    {
+        if (CurrentWorld.HoveredFaction != null)
+        {
+            AddHoveredCellsToHighlight(CurrentWorld.HoveredFaction);
+
+            CurrentWorld.HoveredFaction.IsHovered = false;
+            CurrentWorld.HoveredFaction = null;
+        }
+
+        if (faction != null)
+        {
+            CurrentWorld.HoveredFaction = faction;
+            faction.IsHovered = true;
+
+            AddHoveredCellsToHighlight(faction);
+        }
+    }
+
     public static void SetSelectedCell(TerrainCell cell)
     {
         if (CurrentWorld.SelectedCell != null)
         {
-            AddHighlightedCell(CurrentWorld.SelectedCell, CellUpdateType.All);
+            AddSelectedCellToHighlight(CurrentWorld.SelectedCell);
 
             CurrentWorld.SelectedCell.IsSelected = false;
             CurrentWorld.SelectedCell = null;
         }
 
+        if (cell == null)
+            return;
+
+        CurrentWorld.SelectedCell = cell;
+        cell.IsSelected = true;
+
+        AddSelectedCellToHighlight(cell);
+
+        SetSelectedRegion(cell.Region);
+        SetSelectedTerritory(cell.EncompassingTerritory);
+    }
+
+    public static void SetHoveredCell(TerrainCell cell)
+    {
+        if (CurrentWorld.HoveredCell != null)
+        {
+            AddHoveredCellToHighlight(CurrentWorld.HoveredCell);
+
+            CurrentWorld.HoveredCell.IsHovered = false;
+            CurrentWorld.HoveredCell = null;
+        }
+
+        Region region = null;
+        Territory territory = null;
+        Faction faction = null;
+
         if (cell != null)
         {
-            CurrentWorld.SelectedCell = cell;
-            CurrentWorld.SelectedCell.IsSelected = true;
+            CurrentWorld.HoveredCell = cell;
+            cell.IsHovered = true;
 
-            AddHighlightedCell(CurrentWorld.SelectedCell, CellUpdateType.All);
+            AddHoveredCellToHighlight(cell);
 
-            SetSelectedRegion(cell.Region);
-            SetSelectedTerritory(cell.EncompassingTerritory);
+            region = cell.Region;
+            territory = cell.EncompassingTerritory;
+            faction = cell.GetMostProminentClosestFaction();
         }
+
+        SetHoveredRegion(region);
+        SetHoveredTerritory(territory);
+        SetHoveredFaction(faction);
     }
 
-    /// <summary>Puts the given <c>polity</c> under player focus.</summary>
-    /// <param name="polity">The polity to be put under player focus.</param>
-    public static void SetFocusOnPolity (Polity polity) {
+    public static void SetFocusOnPolity(Polity polity)
+    {
+        if (polity == null)
+            return;
 
-		if (polity == null)
-			return;
+        if (CurrentWorld.PolitiesUnderPlayerFocus.Contains(polity))
+            return;
 
-		if (CurrentWorld.PolitiesUnderPlayerFocus.Contains (polity))
-			return;
-
-		polity.SetUnderPlayerFocus (true);
-		CurrentWorld.PolitiesUnderPlayerFocus.Add (polity);
-	}
-
-    /// <summary>Removes the given <c>polity</c> from player focus.</summary>
-    /// <param name="polity">The polity to be removed from player focus.</param>
-	public static void UnsetFocusOnPolity (Polity polity) {
-
-		if (polity == null)
-			return;
-
-		if (!CurrentWorld.PolitiesUnderPlayerFocus.Contains (polity))
-			return;
-			
-		polity.SetUnderPlayerFocus (false);
-		CurrentWorld.PolitiesUnderPlayerFocus.Remove (polity);
+        polity.SetUnderPlayerFocus(true);
+        CurrentWorld.PolitiesUnderPlayerFocus.Add(polity);
     }
 
-    /// <summary>Puts the given <c>faction</c> under player guidance.</summary>
-    /// <param name="faction">The faction to be put under player guidance.</param>
-    /// <remarks>Only one faction can be under player guidance per world.</remarks>
+    public static void UnsetFocusOnPolity(Polity polity)
+    {
+        if (polity == null)
+            return;
+
+        if (!CurrentWorld.PolitiesUnderPlayerFocus.Contains(polity))
+            return;
+
+        polity.SetUnderPlayerFocus(false);
+        CurrentWorld.PolitiesUnderPlayerFocus.Remove(polity);
+    }
+
     public static void SetGuidedFaction(Faction faction)
     {
         if (CurrentWorld.GuidedFaction == faction)
             return;
 
-        CurrentWorld.GuidedFaction?.SetUnderPlayerGuidance(false);
-
-        faction?.SetUnderPlayerGuidance(true);
+        if (CurrentWorld.GuidedFaction != null)
+        {
+            CurrentWorld.GuidedFaction.SetUnderPlayerGuidance(false);
+        }
 
         CurrentWorld.GuidedFaction = faction;
+
+        if (faction != null)
+        {
+            faction.SetUnderPlayerGuidance(true);
+
+            EventManager.GuidedFactionSet.Invoke(true);
+        }
+        else
+        {
+            EventManager.GuidedFactionSet.Invoke(false);
+        }
     }
 
-    /// <summary>Resets the currently updated and highlighted cells.</summary>
     public static void ResetUpdatedAndHighlightedCells()
     {
         _lastUpdatedCells.Clear();
@@ -1843,7 +2266,6 @@ public class Manager
         HighlightedCells.Clear();
     }
 
-    /// <summary>Updates the pointer overlay textures in the world editor.</summary>
     public static void UpdatePointerOverlayTextures()
     {
         if (_editorBrushWasVisible || EditorBrushIsVisible)
@@ -1861,8 +2283,7 @@ public class Manager
         }
     }
 
-    /// <summary>Applies the editor brush to the world map in the editor.</summary>
-    public static void ApplyEditorBrush() // This is a pretty complex function that could use some more comments
+    public static void ApplyEditorBrush()
     {
         if (EditorBrushIsVisible && EditorBrushIsActive &&
             (EditorBrushType != EditorBrushType.None) &&
@@ -1896,8 +2317,8 @@ public class Manager
                 }
 
                 int jDiff = j - centerY;
-                int iRadius = (int) MathUtility.GetComponent(fRadius, jDiff);
-                
+                int iRadius = (int)MathUtility.GetComponent(fRadius, jDiff);
+
                 int offsetI = centerX - iRadius;
                 mOffsetI = (mOffsetI + offsetI + sizeX) % sizeX; // make sure the brush wraps around the x-axis and account for radial y-axis wraps
                 int iDiameter = 1 + (iRadius * 2);
@@ -1925,10 +2346,6 @@ public class Manager
         }
     }
 
-    /// <summary>Determines what layer to apply the editor brush at.</summary>
-    /// <param name="longitude">The longitude the editor brush was applied at.</param>
-    /// <param name="latitude">The latitude the editor brush was applied at.</param>
-    /// <param name="distanceFactor">The distance the editor brush extends.</param>
     private static void ApplyEditorBrush(int longitude, int latitude, float distanceFactor)
     {
         switch (EditorBrushType)
@@ -1950,10 +2367,6 @@ public class Manager
         }
     }
 
-    /// <summary>Determines what layer to apply the flattened editor brush at.</summary>
-    /// <param name="longitude">The longitude the editor brush was applied at.</param>
-    /// <param name="latitude">The latitude the editor brush was applied at.</param>
-    /// <param name="distanceFactor">The distance the editor brush extends.</param>
     private static void ApplyEditorBrushFlatten(int longitude, int latitude, float distanceFactor)
     {
         switch (EditorBrushType)
@@ -1975,11 +2388,9 @@ public class Manager
         }
     }
 
-    /// <summary>Resets the slants of all the neighbor cells around <c>cell</c>.</summary>
-    /// <param name="cell">The cell where the neighbors are derived from.</param>
-    public static void ResetSlantsAround(TerrainCell cell) // What is a cell slant?
+    public static void ResetSlantsAround(TerrainCell cell)
     {
-        foreach (TerrainCell nCell in cell.Neighbors.Values)
+        foreach (TerrainCell nCell in cell.NeighborList)
         {
             _manager._currentCellSlants[nCell.Longitude, nCell.Latitude] = null;
         }
@@ -1987,26 +2398,39 @@ public class Manager
         _manager._currentCellSlants[cell.Longitude, cell.Latitude] = null;
     }
 
-    /// <summary>Activates the editor brush based on the given <c>state</c>.</summary>
-    /// <param name="state">If set to <c>true</c>, the editor brush is activated; otherwise, false.</param>
-    public static void ActivateEditorBrush(bool state)
+    /// <summary>
+    /// Tests if the selected editor brush can be activated.
+    /// </summary>
+    /// <returns>
+    ///   <c>true</c> if the brush can be activated. Otherwise, <c>false</c>.
+    /// </returns>
+    public static bool CanActivateBrush()
     {
-        bool useLayerBrush = false;
-
         if (EditorBrushType == EditorBrushType.Layer)
         {
-            if (!Layer.IsValidLayerId(_planetOverlaySubtype))
-            {
-                return;
-            }
-
-            useLayerBrush = true;
+            return Layer.IsValidLayerId(_planetOverlaySubtype);
         }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Tells if the manager should activate the selected editor brush or not.
+    /// </summary>
+    /// <param name="state">
+    /// Indicates if the brush should be activated.
+    /// </param>
+    public static void ActivateEditorBrush(bool state)
+    {
+        bool useLayerBrush = EditorBrushType == EditorBrushType.Layer;
 
         EditorBrushIsActive = state;
 
         if (state)
         {
+            // Applying any kind of brush will make it necessary to do drainage regeneration
+            CurrentWorld.NeedsDrainageRegeneration = true;
+
             if (useLayerBrush)
             {
                 ActiveEditorBrushAction = new LayerBrushAction(_planetOverlaySubtype);
@@ -2018,9 +2442,16 @@ public class Manager
         }
         else if (ActiveEditorBrushAction != null)
         {
-            CurrentWorld.PerformTerrainAlterationDrainageRegen();
-            CurrentWorld.RepeatTerrainAlterationDrainageRegen();
-            CurrentWorld.FinalizeTerrainAlterationDrainageRegen();
+            ////
+            // TODO: Figure out how to make drainage regen work
+            //
+            //CurrentWorld.PerformTerrainAlterationDrainageRegen(); // do a test drainage expansion to find all cells that need to be recalculated. changes will not persist
+            //
+            //CurrentWorld.GenerateDrainageBasins(true); // redo drainage expansion to modify terrain
+            //CurrentWorld.GenerateDrainageBasins(false); // final proper drainage expansion with already modified terrain
+            //
+            //CurrentWorld.FinalizeTerrainAlterationDrainageRegen();
+            ////
 
             ActiveEditorBrushAction.FinalizeCellModifications();
 
@@ -2031,16 +2462,12 @@ public class Manager
         }
     }
 
-    /// <summary>Applies the editor brush on the altitude layer.</summary>
-    /// <param name="longitude">The longitude to be applied at.</param>
-    /// <param name="latitude">The latitude to be applied at.</param>
-    /// <param name="distanceFactor">The distance the editor brush extends.</param>
     private static void ApplyEditorBrush_Altitude(int longitude, int latitude, float distanceFactor)
     {
         float strength = EditorBrushStrength / AltitudeScale;
-        float noiseRadius = BrushNoiseRadiusFactor / EditorBrushRadius;
+        float noiseRadius = BrushNoiseRadiusFactor / (float)EditorBrushRadius;
 
-        float strToValue = BrushStrengthFactor_Base * BrushStrengthFactor_Altitude * 
+        float strToValue = BrushStrengthFactor_Base * BrushStrengthFactor_Altitude *
             (MathUtility.GetPseudoNormalDistribution(distanceFactor * 2) - MathUtility.NormalAt2) / (MathUtility.NormalAt0 - MathUtility.NormalAt2);
         float valueOffset = strength * strToValue;
 
@@ -2051,10 +2478,6 @@ public class Manager
         ResetSlantsAround(cell);
     }
 
-    /// <summary>Applies the flattened editor brush on the altitude layer.</summary>
-    /// <param name="longitude">The longitude to be applied at.</param>
-    /// <param name="latitude">The latitude to be applied at.</param>
-    /// <param name="distanceFactor">The distance the editor brush extends.</param>
     private static void ApplyEditorBrushFlatten_Altitude(int longitude, int latitude, float distanceFactor)
     {
         float strength = EditorBrushStrength / AltitudeScale;
@@ -2071,10 +2494,10 @@ public class Manager
         TerrainCell cellSouth = CurrentWorld.GetCellWithSphericalWrap(longitude, latitude + sampleRadius);
         TerrainCell cellWest = CurrentWorld.GetCellWithSphericalWrap(longitude - sampleRadius, latitude);
 
-        float targetValue = 
-            (cellNorth.BaseAltitudeValue + 
-            cellEast.BaseAltitudeValue + 
-            cellSouth.BaseAltitudeValue + 
+        float targetValue =
+            (cellNorth.BaseAltitudeValue +
+            cellEast.BaseAltitudeValue +
+            cellSouth.BaseAltitudeValue +
             cellWest.BaseAltitudeValue) / 4f;
 
         float currentValue = cell.BaseAltitudeValue;
@@ -2085,13 +2508,9 @@ public class Manager
         ResetSlantsAround(cell);
     }
 
-    /// <summary>Applies the editor brush on the temperature layer.</summary>
-    /// <param name="longitude">The longitude to be applied at.</param>
-    /// <param name="latitude">The latitude to be applied at.</param>
-    /// <param name="distanceFactor">The distance the editor brush extends.</param>
     private static void ApplyEditorBrush_Temperature(int longitude, int latitude, float distanceFactor)
     {
-        float noiseRadius = BrushNoiseRadiusFactor / EditorBrushRadius;
+        float noiseRadius = BrushNoiseRadiusFactor / (float)EditorBrushRadius;
 
         float strToValue = BrushStrengthFactor_Base * BrushStrengthFactor_Temperature *
             (MathUtility.GetPseudoNormalDistribution(distanceFactor * 2) - MathUtility.NormalAt2) / (MathUtility.NormalAt0 - MathUtility.NormalAt2);
@@ -2102,10 +2521,6 @@ public class Manager
         CurrentWorld.ModifyCellTemperature(cell, valueOffset, EditorBrushNoise, noiseRadius);
     }
 
-    /// <summary>Applies the flattened editor brush on the altitude layer.</summary>
-    /// <param name="longitude">The longitude to be applied at.</param>
-    /// <param name="latitude">The latitude to be applied at.</param>
-    /// <param name="distanceFactor">The distance the editor brush extends.</param>
     private static void ApplyEditorBrushFlatten_Temperature(int longitude, int latitude, float distanceFactor)
     {
         int sampleRadius = 1;
@@ -2133,10 +2548,6 @@ public class Manager
         CurrentWorld.ModifyCellTemperature(cell, valueOffset);
     }
 
-    /// <summary>Applies the editor brush on the generic? layer.</summary>
-    /// <param name="longitude">The longitude to be applied at.</param>
-    /// <param name="latitude">The latitude to be applied at.</param>
-    /// <param name="distanceFactor">The distance the editor brush extends.</param>
     private static void ApplyEditorBrush_Layer(int longitude, int latitude, float distanceFactor)
     {
         if (!Layer.IsValidLayerId(_planetOverlaySubtype))
@@ -2144,7 +2555,7 @@ public class Manager
             throw new System.Exception("Not a recognized layer Id: " + _planetOverlaySubtype);
         }
 
-        float noiseRadius = BrushNoiseRadiusFactor / EditorBrushRadius;
+        float noiseRadius = BrushNoiseRadiusFactor / (float)EditorBrushRadius;
 
         float strToValue = BrushStrengthFactor_Base * BrushStrengthFactor_Layer *
             (MathUtility.GetPseudoNormalDistribution(distanceFactor * 2) - MathUtility.NormalAt2) / (MathUtility.NormalAt0 - MathUtility.NormalAt2);
@@ -2155,10 +2566,6 @@ public class Manager
         CurrentWorld.ModifyCellLayerData(cell, valueOffset, _planetOverlaySubtype, EditorBrushNoise, noiseRadius);
     }
 
-    /// <summary>Applies the flattened editor brush on the generic? layer.</summary>
-    /// <param name="longitude">The longitude to be applied at.</param>
-    /// <param name="latitude">The latitude to be applied at.</param>
-    /// <param name="distanceFactor">The distance the editor brush extends.</param>
     private static void ApplyEditorBrushFlatten_Layer(int longitude, int latitude, float distanceFactor)
     {
         if (!Layer.IsValidLayerId(_planetOverlaySubtype))
@@ -2191,13 +2598,9 @@ public class Manager
         CurrentWorld.ModifyCellLayerData(cell, valueOffset, _planetOverlaySubtype);
     }
 
-    /// <summary>Applies the editor brush on the rainfall layer.</summary>
-    /// <param name="longitude">The longitude to be applied at.</param>
-    /// <param name="latitude">The latitude to be applied at.</param>
-    /// <param name="distanceFactor">The distance the editor brush extends.</param>
     private static void ApplyEditorBrush_Rainfall(int longitude, int latitude, float distanceFactor)
     {
-        float noiseRadius = BrushNoiseRadiusFactor / EditorBrushRadius;
+        float noiseRadius = BrushNoiseRadiusFactor / (float)EditorBrushRadius;
 
         float strToValue = BrushStrengthFactor_Base * BrushStrengthFactor_Rainfall *
             (MathUtility.GetPseudoNormalDistribution(distanceFactor * 2) - MathUtility.NormalAt2) / (MathUtility.NormalAt0 - MathUtility.NormalAt2);
@@ -2208,10 +2611,6 @@ public class Manager
         CurrentWorld.ModifyCellRainfall(cell, valueOffset, EditorBrushNoise, noiseRadius);
     }
 
-    /// <summary>Applies the flattened editor brush on the rainfall layer.</summary>
-    /// <param name="longitude">The longitude to be applied at.</param>
-    /// <param name="latitude">The latitude to be applied at.</param>
-    /// <param name="distanceFactor">The distance the editor brush extends.</param>
     private static void ApplyEditorBrushFlatten_Rainfall(int longitude, int latitude, float distanceFactor)
     {
         int sampleRadius = 1;
@@ -2239,7 +2638,6 @@ public class Manager
         CurrentWorld.ModifyCellRainfall(cell, valueOffset);
     }
 
-    /// <summary>Updates the state of the editor brush.</summary>
     public static void UpdateEditorBrushState()
     {
         _lastEditorBrushTargetCell = EditorBrushTargetCell;
@@ -2247,63 +2645,45 @@ public class Manager
         _editorBrushWasVisible = EditorBrushIsVisible;
     }
 
-    /// <summary>Updates the texture colors of the map, map overlays, and map activity.</summary>
-    /// <remarks>If shaders are enabled, those will be updated as well.</remarks>
     public static void UpdateTextures()
     {
-        if (DebugModeEnabled)
+        if (CurrentDevMode != DevMode.None)
         {
             UpdatedPixelCount = 0;
         }
-
-        //Profiler.BeginSample("UpdateMapTextureColors");
 
         UpdateMapTextureColors();
         UpdateMapOverlayTextureColors();
         UpdateMapActivityTextureColors();
 
-        if (AnimationShadersEnabled && (PlanetOverlay == PlanetOverlay.DrainageBasins))
+        if (Manager.AnimationShadersEnabled && (PlanetOverlay == PlanetOverlay.DrainageBasins))
         {
             UpdateMapOverlayShaderTextureColors();
         }
-
-        //Profiler.EndSample();
-
-        //Profiler.BeginSample("CurrentMapTexture.SetPixels32");
 
         CurrentMapTexture.SetPixels32(_manager._currentMapTextureColors);
         CurrentMapOverlayTexture.SetPixels32(_manager._currentMapOverlayTextureColors);
         CurrentMapActivityTexture.SetPixels32(_manager._currentMapActivityTextureColors);
 
-        if (AnimationShadersEnabled && (PlanetOverlay == PlanetOverlay.DrainageBasins))
+        if (Manager.AnimationShadersEnabled && (PlanetOverlay == PlanetOverlay.DrainageBasins))
         {
             CurrentMapOverlayShaderInfoTexture.SetPixels32(_manager._currentMapOverlayShaderInfoColor);
         }
-
-        //Profiler.EndSample();
-
-        //Profiler.BeginSample("CurrentMapTexture.Apply");
 
         CurrentMapTexture.Apply();
         CurrentMapOverlayTexture.Apply();
         CurrentMapActivityTexture.Apply();
 
-        if (AnimationShadersEnabled && (PlanetOverlay == PlanetOverlay.DrainageBasins))
+        if (Manager.AnimationShadersEnabled && (PlanetOverlay == PlanetOverlay.DrainageBasins))
         {
             CurrentMapOverlayShaderInfoTexture.Apply();
         }
 
-        //Profiler.EndSample();
-
-        //Profiler.BeginSample("ResetUpdatedAndHighlightedCells");
-
         ResetUpdatedAndHighlightedCells();
 
-        //Profiler.EndSample();
+        LastTextureUpdateDate = CurrentWorld.CurrentDate;
     }
 
-    /// <summary>Updates the pointer overlay texture colors with a new array of RBGA colors from <c>textureColors</c>.</summary>
-    /// <param name="textureColors">The texture colors that will be used to update the pointer overlay texture colors.</param>
     public static void UpdatePointerOverlayTextureColors(Color32[] textureColors)
     {
         if (_editorBrushWasVisible && (_lastEditorBrushTargetCell != null))
@@ -2317,7 +2697,6 @@ public class Manager
         }
     }
 
-    /// <summary>Updates the map texture colors by applying the current map RBGA array to every terrain cell.</summary>
     public static void UpdateMapTextureColors()
     {
         Color32[] textureColors = _manager._currentMapTextureColors;
@@ -2328,12 +2707,17 @@ public class Manager
         }
     }
 
-    /// <summary>
-    ///   Updates the map overlay texture colors by applying the current map overlay RBGA array to every terrain cell.
-    /// </summary>
     public static void UpdateMapOverlayTextureColors()
     {
         Color32[] textureColors = _manager._currentMapOverlayTextureColors;
+
+        foreach (TerrainCell cell in _lastUpdatedCells)
+        {
+            if (UpdatedCells.Contains(cell))
+                continue;
+
+            UpdateMapOverlayTextureColorsFromCell(textureColors, cell);
+        }
 
         foreach (TerrainCell cell in UpdatedCells)
         {
@@ -2341,10 +2725,6 @@ public class Manager
         }
     }
 
-    /// <summary>
-    ///   Updates the map activity texture colors by applying the current map activity RBGA array to every terrain cell.
-    /// </summary>
-    /// <remarks>Conditionally will update group activity and routes if each respective option is true.</remarks>
     public static void UpdateMapActivityTextureColors()
     {
         Color32[] textureColors = _manager._currentMapActivityTextureColors;
@@ -2382,50 +2762,118 @@ public class Manager
         }
     }
 
-    /// <summary>
-    ///   Updates the map overlay shader texture colors by applying the current map overlay shader RBGA array to every terrain cell.
-    /// </summary>
     public static void UpdateMapOverlayShaderTextureColors()
     {
         Color32[] overlayShaderInfoColors = _manager._currentMapOverlayShaderInfoColor;
-        
+
         foreach (TerrainCell cell in UpdatedCells)
         {
             UpdateMapOverlayShaderTextureColorsFromCell(overlayShaderInfoColors, cell);
         }
     }
 
-    /// <summary>Determines if the given <c>cell</c> should be highlighted.</summary>
-    /// <param name="cell">The cell to be evaluated.</param>
-    /// <returns></returns>
     public static bool CellShouldBeHighlighted(TerrainCell cell)
     {
-        if (cell.IsSelected)
+        if (((_highlightMode & HighlightMode.OnSelectedCell) == HighlightMode.OnSelectedCell) &&
+            cell.IsSelected)
+        {
             return true;
-
-        if ((_observableUpdateTypes & CellUpdateType.Region) == CellUpdateType.Region)
-        {
-            if ((cell.Region != null) && cell.Region.IsSelected)
-                return true;
         }
-        else if (((_observableUpdateTypes & CellUpdateType.Territory) == CellUpdateType.Territory) &&
-            (_planetOverlay != PlanetOverlay.PolityContacts))
+
+        if (((_highlightMode & HighlightMode.OnHoveredCell) == HighlightMode.OnHoveredCell) &&
+            cell.IsHovered)
         {
-            if ((cell.EncompassingTerritory != null) && cell.EncompassingTerritory.IsSelected)
+            return true;
+        }
+
+        if (((_observableUpdateTypes & CellUpdateType.Region) == CellUpdateType.Region) &&
+            (cell.Region != null))
+        {
+            if (((_highlightMode & HighlightMode.OnSelectedCollection) ==
+                HighlightMode.OnSelectedCollection) && cell.Region.IsSelected &&
+                (_filterHighlightCollection?.Invoke(cell.Region) ?? true))
+            {
                 return true;
+            }
+
+            if (((_highlightMode & HighlightMode.OnHoveredCollection) ==
+                HighlightMode.OnHoveredCollection) && cell.Region.IsHovered &&
+                (_filterHighlightCollection?.Invoke(cell.Region) ?? true))
+            {
+                return true;
+            }
+        }
+
+        if (((_observableUpdateTypes & CellUpdateType.Territory) == CellUpdateType.Territory) &&
+            (cell.EncompassingTerritory != null))
+        {
+            if (((_highlightMode & HighlightMode.OnSelectedCollection) ==
+                HighlightMode.OnSelectedCollection) && cell.EncompassingTerritory.IsSelected &&
+                (_filterHighlightCollection?.Invoke(cell.EncompassingTerritory) ?? true))
+            {
+                return true;
+            }
+
+            if (((_highlightMode & HighlightMode.OnHoveredCollection) ==
+                HighlightMode.OnHoveredCollection) && cell.EncompassingTerritory.IsHovered &&
+                (_filterHighlightCollection?.Invoke(cell.EncompassingTerritory) ?? true))
+            {
+                return true;
+            }
+
+            var faction = cell.GetClosestFaction(cell.EncompassingTerritory.Polity);
+
+            if (faction != null)
+            {
+                if (((_highlightMode & HighlightMode.OnHoveredCollection) ==
+                    HighlightMode.OnHoveredCollection) && faction.IsHovered &&
+                    (_filterHighlightCollection?.Invoke(faction) ?? true))
+                {
+                    return true;
+                }
+            }
         }
 
         return false;
     }
 
-    /// <summary>Updates the pointer overlay texture colors from the editor brush.</summary>
-    /// <param name="textureColors">The updated texture colors.</param>
-    /// <param name="centerCell">The center cell of the editor brush.</param>
-    /// <param name="radius">The radius of the editor brush.</param>
-    /// <param name="erase">If set to <c>true</c>, will erase.</param>
+    public static bool TerritoryShouldBeHighlighted(Territory territory)
+    {
+        if (((_highlightMode & HighlightMode.OnSelectedCollection) == HighlightMode.OnSelectedCollection) &&
+            territory.IsSelected)
+        {
+            return true;
+        }
+
+        if (((_highlightMode & HighlightMode.OnHoveredCollection) == HighlightMode.OnHoveredCollection) &&
+            territory.IsHovered)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    public static bool RegionShouldBeHighlighted(Region region)
+    {
+        if (((_highlightMode & HighlightMode.OnSelectedCollection) == HighlightMode.OnSelectedCollection) &&
+            region.IsSelected)
+        {
+            return true;
+        }
+
+        if (((_highlightMode & HighlightMode.OnHoveredCollection) == HighlightMode.OnHoveredCollection) &&
+            region.IsHovered)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
     public static void UpdatePointerOverlayTextureColorsFromBrush(Color32[] textureColors, TerrainCell centerCell, int radius, bool erase = false)
     {
-        World world = centerCell.World; // Please document this function :(
+        World world = centerCell.World;
 
         int sizeX = world.Width;
         int sizeY = world.Height;
@@ -2492,9 +2940,6 @@ public class Manager
         }
     }
 
-    /// <summary>Updates the map texture colors from the given <c>cell</c> using <c>textureColors</c>.</summary>
-    /// <param name="textureColors">The texture colors to be updated.</param>
-    /// <param name="cell">The cell which will be used to update the map texture colors.</param>
     public static void UpdateMapTextureColorsFromCell(Color32[] textureColors, TerrainCell cell)
     {
         World world = cell.World;
@@ -2517,7 +2962,7 @@ public class Manager
 
                 textureColors[offsetY + offsetX] = cellColor;
 
-                if (DebugModeEnabled)
+                if (CurrentDevMode != DevMode.None)
                 {
                     UpdatedPixelCount++;
                 }
@@ -2525,9 +2970,6 @@ public class Manager
         }
     }
 
-    /// <summary>Updates the map overlay texture colors from the given <c>cell</c> using <c>textureColors</c>.</summary>
-    /// <param name="textureColors">The texture colors to be updated.</param>
-    /// <param name="cell">The cell which will be used to update the map overlay texture colors.</param>
     public static void UpdateMapOverlayTextureColorsFromCell(Color32[] textureColors, TerrainCell cell)
     {
         World world = cell.World;
@@ -2550,7 +2992,7 @@ public class Manager
 
                 textureColors[offsetY + offsetX] = cellColor;
 
-                if (DebugModeEnabled)
+                if (CurrentDevMode != DevMode.None)
                 {
                     UpdatedPixelCount++;
                 }
@@ -2558,10 +3000,6 @@ public class Manager
         }
     }
 
-    /// <summary>Updates the map activity texture colors from the given <c>cell</c> using <c>textureColors</c>.</summary>
-    /// <param name="textureColors">The texture colors to be updated.</param>
-    /// <param name="cell">The cell which will be used to update the map activity texture colors.</param>
-    /// <param name="displayActivityCells">If set to <c>true</c>, activity cells will be displayed.</param>
     public static void UpdateMapActivityTextureColorsFromCell(Color32[] textureColors, TerrainCell cell, bool displayActivityCells = false)
     {
         World world = cell.World;
@@ -2584,7 +3022,7 @@ public class Manager
 
                 textureColors[offsetY + offsetX] = cellColor;
 
-                if (DebugModeEnabled)
+                if (CurrentDevMode != DevMode.None)
                 {
                     UpdatedPixelCount++;
                 }
@@ -2592,9 +3030,6 @@ public class Manager
         }
     }
 
-    /// <summary>Updates the map overlay shader texture colors from the given <c>cell</c> using <c>textureColors</c>.</summary>
-    /// <param name="textureColors">The texture colors to be updated.</param>
-    /// <param name="cell">The cell which will be used to update the map overlay shader texture colors.</param>
     public static void UpdateMapOverlayShaderTextureColorsFromCell(Color32[] textureColors, TerrainCell cell)
     {
         World world = cell.World;
@@ -2617,7 +3052,7 @@ public class Manager
 
                 textureColors[offsetY + offsetX] = cellColor;
 
-                if (DebugModeEnabled)
+                if (CurrentDevMode != DevMode.None)
                 {
                     UpdatedPixelCount++;
                 }
@@ -2625,9 +3060,6 @@ public class Manager
         }
     }
 
-    /// <summary>Generates the pointer overlay texture from the given <c>world</c>.</summary>
-    /// <param name="world">The world to generate the pointer overlay texture from.</param>
-    /// <returns>The pointer overlay texture generated from <c>world</c>.</returns>
     public static Texture2D GeneratePointerOverlayTextureFromWorld(World world)
     {
         int sizeX = world.Width;
@@ -2694,7 +3126,7 @@ public class Manager
 
                         textureColors[offsetY + offsetX] = cellColor;
 
-                        if (DebugModeEnabled)
+                        if (CurrentDevMode != DevMode.None)
                         {
                             UpdatedPixelCount++;
                         }
@@ -2721,7 +3153,7 @@ public class Manager
     public static void GenerateMapOverlayTextureFromWorld(World world)
     {
         GenerateTextureColorsFromWorld(world, GenerateOverlayColorFromTerrainCell, out Color32[] textureColors, out Texture2D texture);
-        
+
         _manager._currentMapOverlayTextureColors = textureColors;
         _manager._currentMapOverlayTexture = texture;
     }
@@ -2729,7 +3161,7 @@ public class Manager
     public static void GenerateMapActivityTextureFromWorld(World world)
     {
         GenerateTextureColorsFromWorld(world, GenerateActivityColorFromTerrainCell, out Color32[] textureColors, out Texture2D texture);
-        
+
         _manager._currentMapActivityTextureColors = textureColors;
         _manager._currentMapActivityTexture = texture;
     }
@@ -2737,7 +3169,7 @@ public class Manager
     public static void GenerateMapOverlayShaderInfoTextureFromWorld(World world)
     {
         GenerateTextureColorsFromWorld(world, GenerateOverlayShaderInfoFromTerrainCell, out Color32[] textureColors, out Texture2D texture);
-        
+
         _manager._currentMapOverlayShaderInfoColor = textureColors;
         _manager._currentMapOverlayShaderInfoTexture = texture;
     }
@@ -2755,9 +3187,7 @@ public class Manager
         float eAltitude = 0;
 
         int c = 0;
-        TerrainCell nCell = null;
-
-        if (neighbors.TryGetValue(Direction.West, out nCell))
+        if (neighbors.TryGetValue(Direction.West, out TerrainCell nCell))
         {
             wAltitude += nCell.Altitude;
             c++;
@@ -2775,7 +3205,7 @@ public class Manager
             c++;
         }
 
-        wAltitude /= c;
+        wAltitude /= (float)c;
 
         c = 0;
 
@@ -2797,7 +3227,7 @@ public class Manager
             c++;
         }
 
-        eAltitude /= c;
+        eAltitude /= (float)c;
 
         float value = wAltitude - eAltitude;
 
@@ -2805,6 +3235,8 @@ public class Manager
 
         return value;
     }
+
+    public static bool ResolvingPlayerInvolvedDecisionChain { get; set; }
 
     private static bool IsCoastWater(TerrainCell cell)
     {
@@ -2824,7 +3256,7 @@ public class Manager
 
     private static Color GenerateColorFromTerrainCell(TerrainCell cell)
     {
-        Color color = Color.black;
+        Color color;
 
         switch (_planetView)
         {
@@ -2840,6 +3272,10 @@ public class Manager
                 color = GenerateCoastlineColor(cell);
                 break;
 
+            case PlanetView.Debug:
+                color = GenerateDebugColor(cell);
+                break;
+
             default:
                 throw new System.Exception("Unsupported Planet View Type");
         }
@@ -2852,6 +3288,11 @@ public class Manager
     private static Color GenerateOverlayColorFromTerrainCell(TerrainCell cell)
     {
         Color color = _transparentColor;
+
+        if (cell == null)
+        {
+            throw new System.NullReferenceException("cell is null");
+        }
 
         int? maxPopulation = null;
 
@@ -2901,8 +3342,16 @@ public class Manager
                 color = SetPolityTerritoryOverlayColor(cell, color);
                 break;
 
+            case PlanetOverlay.PolityAdminCost:
+                color = SetPolityAdminCostOverlayColor(cell, color);
+                break;
+
             case PlanetOverlay.PolityCluster:
                 color = SetPolityClusterOverlayColor(cell, color);
+                break;
+
+            case PlanetOverlay.ClusterAdminCost:
+                color = SetClusterAdminCostOverlayColor(cell, color);
                 break;
 
             case PlanetOverlay.FactionCoreDistance:
@@ -2915,6 +3364,10 @@ public class Manager
 
             case PlanetOverlay.PolityContacts:
                 color = SetPolityContactsOverlayColor(cell, color);
+                break;
+
+            case PlanetOverlay.PolityCoreRegions:
+                color = SetPolityCoreRegionsOverlayColor(cell, color);
                 break;
 
             case PlanetOverlay.PolityCulturalPreference:
@@ -2935,6 +3388,14 @@ public class Manager
 
             case PlanetOverlay.PolityCulturalDiscovery:
                 color = SetPolityCulturalDiscoveryOverlayColor(cell, color);
+                break;
+
+            case PlanetOverlay.PolitySelection:
+                color = SetPolitySelectionOverlayColor(cell, color);
+                break;
+
+            case PlanetOverlay.FormationDate:
+                color = SetFormationDateOverlayColor(cell, color);
                 break;
 
             case PlanetOverlay.Temperature:
@@ -2973,6 +3434,22 @@ public class Manager
                 color = SetRegionOverlayColor(cell, color);
                 break;
 
+            case PlanetOverlay.RegionSelection:
+                color = SetRegionSelectionOverlayColor(cell, color);
+                break;
+
+            case PlanetOverlay.FactionSelection:
+                color = SetFactionSelectionOverlayColor(cell, color);
+                break;
+
+            case PlanetOverlay.CellSelection:
+                if (_planetOverlaySubtype == GroupProminenceOverlaySubtype)
+                    color = SetGroupSelectionByProminenceOverlayColor(cell, color);
+                else
+                    throw new System.Exception(
+                        $"Unsupported Planet Overlay Subtype: {_planetOverlaySubtype}");
+                break;
+
             case PlanetOverlay.Language:
                 color = SetLanguageOverlayColor(cell, color);
                 break;
@@ -2981,12 +3458,29 @@ public class Manager
                 color = SetPopulationChangeOverlayColor(cell, color);
                 break;
 
+            case PlanetOverlay.MigrationPressure:
+                color = SetMigrationPressureOverlayColor(cell, color);
+                break;
+
+            case PlanetOverlay.PolityMigrationPressure:
+                color = SetPolityMigrationPressureOverlayColor(cell, color);
+                break;
+
             case PlanetOverlay.UpdateSpan:
                 color = SetUpdateSpanOverlayColor(cell, color);
                 break;
 
+            case PlanetOverlay.Migration:
+                color = SetMigrationOverlayColor(cell, color);
+                break;
+
+            case PlanetOverlay.HumanArrival:
+                color = SetDateofArrivalOverlayColor(cell, color);
+                break;
+
             default:
-                throw new System.Exception("Unsupported Planet Overlay Type");
+                throw new System.Exception(
+                    $"Unsupported Planet Overlay Type: {_planetOverlay}");
         }
 
         return color;
@@ -3001,16 +3495,49 @@ public class Manager
     {
         if (_displayRoutes && cell.HasCrossingRoutes)
         {
+            float maxRouteChance = 0;
+
+            bool hasUsedRoute = false;
+
             foreach (Route route in cell.CrossingRoutes)
             {
-                if (route.Used)
-                    return GetOverlayColor(OverlayColorId.ActiveRoute);
+                CellGroup travelGroup = route.FirstCell.Group;
+
+                if (travelGroup != null)
+                {
+                    float travelFactor = travelGroup.SeaTravelFactor;
+
+                    float routeLength = route.Length;
+                    float routeLengthFactor = Mathf.Pow(routeLength, 2);
+
+                    float successChance = travelFactor / (travelFactor + routeLengthFactor);
+
+                    maxRouteChance = Mathf.Max(maxRouteChance, successChance);
+                }
+
+                hasUsedRoute |= route.Used;
+            }
+
+            if (maxRouteChance > 0)
+            {
+                float alpha = MathUtility.ToPseudoLogaritmicScale01(maxRouteChance, 1f);
+
+                Color color = GetOverlayColor(OverlayColorId.InactiveRoute);
+                color.a = alpha * 0.5f;
+
+                if (hasUsedRoute)
+                {
+                    color = GetOverlayColor(OverlayColorId.ActiveRoute);
+                    color.a = alpha;
+                }
+
+                return color;
             }
         }
-        
+
         if (CellShouldBeHighlighted(cell))
         {
-            return Color.white * 0.75f;
+            return Color.white * 0.65f;
         }
         else if (displayActivityCells)
         {
@@ -3046,7 +3573,7 @@ public class Manager
             return _mapPalette[2];
         }
 
-        if (cell.Altitude > 0)
+        if (!cell.IsBelowSeaLevel)
         {
             if (cell.WaterBiomePresence >= 0.5f)
                 return _mapPalette[3];
@@ -3083,14 +3610,14 @@ public class Manager
 
         if (altitude < 0)
         {
-            value = (2 - altitude / World.MinPossibleAltitude - SeaLevelOffset) / 2f;
+            value = (2 - altitude / World.MinPossibleAltitude - Manager.SeaLevelOffset) / 2f;
 
             Color color1 = Color.blue;
 
             return new Color(color1.r * value, color1.g * value, color1.b * value);
         }
 
-        value = (1 + altitude / (World.MaxPossibleAltitude - SeaLevelOffset)) / 2f;
+        value = (1 + altitude / (World.MaxPossibleAltitude - Manager.SeaLevelOffset)) / 2f;
 
         Color color2 = new Color(1f, 0.6f, 0);
 
@@ -3146,6 +3673,20 @@ public class Manager
         return color * slantFactor * altitudeFactor;
     }
 
+    private static Color GenerateDebugColor(TerrainCell cell)
+    {
+        Color color = Color.white;
+
+        if(cell.IsBelowSeaLevel)
+        {
+            color.r = 0.419f;
+            color.g = 0.36f;
+            color.b = 0.647f;
+        }
+        
+        return color;
+    }
+
     private static bool IsRegionBorder(Region region, TerrainCell cell)
     {
         return region.IsInnerBorderCell(cell);
@@ -3158,7 +3699,7 @@ public class Manager
         if (region != null)
         {
             Color regionColor = GenerateColorFromId(region.Id);
-            
+
             Biome mostPresentBiome = Biome.Biomes[region.BiomeWithMostPresence];
             regionColor = mostPresentBiome.Color * 0.85f + regionColor * 0.15f;
 
@@ -3177,16 +3718,178 @@ public class Manager
         return color;
     }
 
+    private static Color SetRegionSelectionOverlayColor(TerrainCell cell, Color color)
+    {
+        Faction guidedFaction = CurrentWorld.GuidedFaction;
+
+        if (guidedFaction == null)
+        {
+            throw new System.Exception("Can't generate overlay without an active guided faction");
+        }
+
+        Region region = cell.Region;
+
+        if ((region != null) &&
+            (region.SelectionFilterType != Region.FilterType.None))
+        {
+            Color regionColor = GenerateColorFromId(region.Id);
+
+            Biome mostPresentBiome = Biome.Biomes[region.BiomeWithMostPresence];
+            regionColor = mostPresentBiome.Color * 0.85f + regionColor * 0.15f;
+
+            bool isRegionBorder = IsRegionBorder(region, cell);
+
+            if (region.SelectionFilterType == Region.FilterType.Core)
+            {
+                regionColor = (0.4f * regionColor) + 0.6f * Color.blue;
+            }
+            else if (region.SelectionFilterType == Region.FilterType.Selectable)
+            {
+                regionColor = (0.4f * regionColor) + 0.6f * Color.cyan;
+            }
+
+            if (!isRegionBorder)
+            {
+                regionColor /= 1.5f;
+            }
+
+            regionColor.a = 0.5f;
+
+            color = regionColor;
+        }
+
+        return color;
+    }
+
+    private static Color SetPolitySelectionOverlayColor(TerrainCell cell, Color color)
+    {
+        var territory = cell.EncompassingTerritory;
+
+        if ((territory != null) &&
+            (territory.SelectionFilterType != Territory.FilterType.None))
+        {
+            Color polityColor = GenerateColorFromId(territory.Polity.Id);
+
+            bool isTerritoryBorder = IsTerritoryBorder(territory, cell);
+
+            if (territory.SelectionFilterType == Territory.FilterType.Core)
+            {
+                polityColor = (0.2f * polityColor) + 0.8f * Color.blue;
+            }
+            else if (territory.SelectionFilterType == Territory.FilterType.Selectable)
+            {
+                polityColor = (0.2f * polityColor) + 0.8f * Color.cyan;
+            }
+
+            if (!isTerritoryBorder)
+            {
+                polityColor /= 1.5f;
+            }
+
+            polityColor.a = 0.5f;
+
+            color = polityColor;
+        }
+
+        return color;
+    }
+
+    private static Color SetFactionSelectionOverlayColor(TerrainCell cell, Color color)
+    {
+        var territory = cell.EncompassingTerritory;
+
+        if ((territory != null) &&
+            (territory.SelectionFilterType != Territory.FilterType.None))
+        {
+            bool isTerritoryBorder = IsTerritoryBorder(territory, cell);
+
+            Faction faction = cell.GetClosestFaction(territory.Polity);
+
+            bool isSelectableFaction = false;
+
+            if ((faction != null) &&
+                ((faction.SelectionFilterType == Faction.FilterType.Selectable) ||
+                (faction.SelectionFilterType == Faction.FilterType.Related)))
+            {
+                color = GenerateColorFromId(faction.Id);
+
+                if (faction.SelectionFilterType == Faction.FilterType.Related)
+                {
+                    color = (0.3f * color) + 0.7f * Color.yellow;
+                }
+                else if (faction.SelectionFilterType == Faction.FilterType.Selectable)
+                {
+                    color = (0.3f * color) + 0.7f * Color.cyan;
+                    isSelectableFaction = true;
+                }
+            }
+            else
+            {
+                color = GenerateColorFromId(territory.Polity.Id);
+
+                if (territory.SelectionFilterType == Territory.FilterType.Core)
+                {
+                    color = (0.3f * color) + 0.7f * Color.blue;
+                }
+                else if (territory.SelectionFilterType == Territory.FilterType.Involved)
+                {
+                    color = (0.3f * color) + 0.7f * Color.yellow;
+                }
+            }
+
+            if (!isTerritoryBorder)
+            {
+                color /= 1.5f;
+            }
+
+            if (isSelectableFaction)
+            {
+                color.a = 0.5f;
+            }
+            else
+            {
+                color.a = 0.2f;
+            }
+        }
+
+        return color;
+    }
+
+    private static Color SetGroupSelectionByProminenceOverlayColor(TerrainCell cell, Color color)
+    {
+        if (CurrentWorld.GuidedFaction == null)
+            throw new System.Exception("Can't generate overlay without an active guided faction");
+
+        if (!(CurrentInputRequest is GroupSelectionRequest))
+            throw new System.Exception("Can't generate overlay without an region selection request");
+
+        color = SetPolityProminenceOverlayColor(cell, color);
+
+        if (cell.SelectionFilterType == TerrainCell.FilterType.None)
+        {
+            color *= 0.37f;
+        }
+        else if (cell.SelectionFilterType == TerrainCell.FilterType.Core)
+        {
+            color = (color * 0.5f) + (Color.white * 0.5f);
+        }
+
+        return color;
+    }
+
     private static bool IsLanguageBorder(Language language, TerrainCell cell)
     {
-        foreach (TerrainCell nCell in cell.Neighbors.Values)
+        foreach (TerrainCell nCell in cell.NeighborList)
         {
-            Language nLanguage = nCell.Group?.Culture.Language;
+            if (nCell.Group == null)
+                return true;
+
+            Language nLanguage = nCell.Group.Culture.Language;
 
             if (nLanguage == null)
                 return true;
 
-            if (nLanguage.Id != language.Id)
+            if (nLanguage != language)
                 return true;
         }
 
@@ -3201,7 +3904,7 @@ public class Manager
 
             if (groupLanguage != null)
             {
-                Color languageColor = GenerateColorFromId(groupLanguage.Id, 100);
+                Color languageColor = GenerateColorFromId(groupLanguage.Id);
 
                 bool isLanguageBorder = IsLanguageBorder(groupLanguage, cell);
 
@@ -3225,7 +3928,7 @@ public class Manager
 
     private static bool IsTerritoryBorder(Territory territory, TerrainCell cell)
     {
-        return territory.IsPartOfBorder(cell);
+        return territory.IsPartOfInnerBorder(cell);
     }
 
     private static Color GetUnincorporatedGroupColor()
@@ -3242,11 +3945,18 @@ public class Manager
         {
             Polity territoryPolity = cell.EncompassingTerritory.Polity;
 
-            color = GenerateColorFromId(territoryPolity.Id, 100);
+            color = GenerateColorFromId(territoryPolity.Id);
+
+            bool isPolityCoreGroup = false;
+            bool isFactionCoreGroup = false;
 
             bool isTerritoryBorder = IsTerritoryBorder(cell.EncompassingTerritory, cell);
-            bool isPolityCoreGroup = territoryPolity.CoreGroup == cell.Group;
-            bool isFactionCoreGroup = cell.Group.GetFactionCores().Count > 0;
+
+            if (cell.Group != null)
+            {
+                isPolityCoreGroup = territoryPolity.CoreGroup == cell.Group;
+                isFactionCoreGroup = cell.Group.GetFactionCores().Count > 0;
+            }
 
             if (!isPolityCoreGroup)
             {
@@ -3276,25 +3986,112 @@ public class Manager
 
     private static Color SetPolityClusterOverlayColor(TerrainCell cell, Color color)
     {
-        if (cell.Group != null)
+        CellGroup group = cell.Group;
+
+        if (group != null)
         {
+            bool useSelected = CurrentWorld.SelectedTerritory != null;
+
             if (cell.EncompassingTerritory != null)
             {
                 Polity territoryPolity = cell.EncompassingTerritory.Polity;
 
-                PolityProminence prominence = cell.Group.GetPolityProminence(territoryPolity);
+                PolityProminence prominence = group.GetPolityProminence(territoryPolity);
+                bool isSelected = cell.EncompassingTerritory.IsSelected;
 
-                Color clusterColor = Color.grey;
-
-                if (prominence.Cluster != null)
+                if (useSelected && !isSelected)
                 {
-                    color = GenerateColorFromId(prominence.Cluster.Id, 100);
+                    foreach (var localProminence in group.GetPolityProminences())
+                    {
+                        if (localProminence.Polity.Territory.IsSelected)
+                        {
+                            isSelected = true;
+                            prominence = localProminence;
+                            break;
+                        }
+                    }
+                }
+
+                if (prominence?.Cluster != null)
+                {
+                    color = GenerateColorFromId(prominence.Cluster.Id);
+
+                    if (useSelected && !isSelected)
+                    {
+                        color *= 0.5f;
+                        color.a = 1;
+                    }
                 }
             }
             else
             {
                 color = GetUnincorporatedGroupColor();
             }
+        }
+
+        return color;
+    }
+
+    private static Color SetClusterAdminCostOverlayColor(TerrainCell cell, Color color)
+    {
+        CellGroup group = cell?.Group;
+
+        if (group != null)
+        {
+            color = GetUnincorporatedGroupColor();
+
+            bool foundCluster = false;
+            bool isSelected = false;
+            float maxAdminCost = 0;
+            bool useSelected = CurrentWorld.SelectedTerritory != null;
+
+            foreach (var prominence in group.GetPolityProminences())
+            {
+                foundCluster = true;
+
+                if (prominence.Polity.Territory.IsSelected)
+                    isSelected = true;
+
+                float adminCost =
+                    Mathf.Min(prominence.Cluster.TotalAdministrativeCost, PolityProminenceCluster.MaxAdminCost);
+
+                if (isSelected)
+                {
+                    maxAdminCost = adminCost;
+                    break;
+                }
+                else
+                {
+                    maxAdminCost = Mathf.Max(adminCost, maxAdminCost);
+                }
+            }
+
+            if (foundCluster)
+            {
+                if (CurrentMaxAdminCost < maxAdminCost)
+                    CurrentMaxAdminCost = maxAdminCost;
+
+                float value = 0;
+                if (maxAdminCost > 0)
+                {
+                    value = maxAdminCost / CurrentMaxAdminCost;
+                    value = MathUtility.ToPseudoLogaritmicScale01(value, 1f);
+                }
+
+                value = 0.25f + 0.75f * Mathf.Clamp01(value);
+
+                if (useSelected && !isSelected)
+                {
+                    color = (Color.cyan + Color.yellow) * value / 2;
+                }
+                else
+                {
+                    color = Color.yellow * value;
+                }
+                color.a = 1;
+            }
+
+            return color;
         }
 
         return color;
@@ -3308,11 +4105,11 @@ public class Manager
             {
                 Polity territoryPolity = cell.EncompassingTerritory.Polity;
 
-                Color territoryColor = GenerateColorFromId(territoryPolity.Id, 100);
+                Color territoryColor = GenerateColorFromId(territoryPolity.Id);
 
-                PolityProminence pi = cell.Group.GetPolityProminence(territoryPolity);
+                float factionCoreDistance = cell.Group.GetFactionCoreDistance(territoryPolity);
 
-                float distanceFactor = Mathf.Sqrt(pi.FactionCoreDistance);
+                float distanceFactor = Mathf.Sqrt(factionCoreDistance);
                 distanceFactor = 1 - 0.9f * Mathf.Min(1, distanceFactor / 50f);
 
                 color = territoryColor * distanceFactor;
@@ -3335,13 +4132,13 @@ public class Manager
             float totalProminenceValueFactor = 0;
 
             Color mixedPolityColor = Color.black;
-            foreach (PolityProminence p in cell.Group.GetPolityProminences())
+            foreach (PolityProminence p in cell.PolityProminences)
             {
                 polityCount++;
 
                 float prominenceValueFactor = 0.2f + p.Value;
 
-                Color polityColor = GenerateColorFromId(p.PolityId, 100);
+                Color polityColor = GenerateColorFromId(p.PolityId);
                 polityColor *= prominenceValueFactor;
                 totalProminenceValueFactor += prominenceValueFactor;
 
@@ -3363,14 +4160,32 @@ public class Manager
         return color;
     }
 
-    private static Color GenerateColorFromId(long id, int oom = 1)
+    private static Color SetFormationDateOverlayColor(TerrainCell cell, Color color)
     {
-        long mId = id / oom;
+        if(cell.EncompassingTerritory != null)
+        {
+            Polity territoryPolity = cell.EncompassingTerritory.Polity;
 
-        long primaryColor = mId % 3;
+            float value = (float)territoryPolity.FormationDate / CurrentWorld.CurrentDate;
+
+            color = new Color(value, value/2f, 1f-value);
+        }
+
+        return color;
+    }
+
+    private static Color GenerateColorFromId(Identifier id)
+    {
+        int mId = id.GetHashCode();
+        if (mId < 0)
+        {
+            mId = int.MaxValue + mId + 1;
+        }
+
+        int primaryColor = mId % 3;
         float secondaryColorIntensity = ((mId / 3) % 4) / 3f;
         float tertiaryColorIntensity = ((mId / 12) % 2) / 2f;
-        long secondaryColor = (mId / 24) % 2;
+        int secondaryColor = (mId / 24) % 2;
 
         float red = 0;
         float green = 0;
@@ -3425,18 +4240,22 @@ public class Manager
                 break;
         }
 
-        return new Color(red, green, blue, 1.0f);
+        Color color = new Color(red, green, blue, 1.0f);
+
+        return color;
     }
 
     private static Color SetPolityContactsOverlayColor(TerrainCell cell, Color color)
     {
-        if (cell.Group == null)
-            return color;
-        
         Territory territory = cell.EncompassingTerritory;
 
         if (territory == null)
+        {
+            if (cell.Group == null)
+                return color;
+
             return GetUnincorporatedGroupColor();
+        }
 
         float contactValue = 0;
 
@@ -3454,11 +4273,11 @@ public class Manager
 
             if (selectedTerritory != territory)
             {
-                int contactGroupCount = selectedPolity.GetContactGroupCount(polity);
+                int count = selectedPolity.GetContactCount(polity);
 
-                contactValue = MathUtility.ToPseudoLogaritmicScale01(contactGroupCount);
+                contactValue = MathUtility.ToPseudoLogaritmicScale01(count);
 
-                isInContact = (contactValue > 0);
+                isInContact = (count > 0);
             }
             else
             {
@@ -3498,9 +4317,80 @@ public class Manager
         return color;
     }
 
+    private static Color SetPolityCoreRegionsOverlayColor(TerrainCell cell, Color color)
+    {
+        float unselectedAlpha = 0.4f;
+
+        Territory territory = cell.EncompassingTerritory;
+        Region region = cell.Region;
+
+        Color backColor = color;
+
+        if (territory != null)
+        {
+            backColor = GenerateColorFromId(territory.Polity.Id);
+
+            if (IsTerritoryBorder(territory, cell))
+            {
+                backColor /= 1.25f;
+            }
+
+            if (!territory.IsSelected)
+            {
+                backColor.a *= unselectedAlpha;
+            }
+        }
+        else if (cell.Group != null)
+        {
+            backColor = GetUnincorporatedGroupColor();
+        }
+        else if ((region == null) ||
+            (region.SelectionFilterType != Region.FilterType.Core))
+        {
+            return color;
+        }
+
+        color = backColor;
+
+        Polity selectedPolity = CurrentWorld.SelectedTerritory?.Polity;
+
+        if ((selectedPolity != null) &&
+            (territory != CurrentWorld.SelectedTerritory) &&
+            (region != null) &&
+            (region.SelectionFilterType == Region.FilterType.Core))
+        {
+            Color regionColor = GenerateColorFromId(region.Id);
+            Color selPolityColor = GenerateColorFromId(selectedPolity.Id);
+            selPolityColor.a *= unselectedAlpha;
+
+            Biome mostPresentBiome = Biome.Biomes[region.BiomeWithMostPresence];
+            regionColor = Color.white * 0.2f + mostPresentBiome.Color * 0.65f + regionColor * 0.15f;
+
+            regionColor.a *= unselectedAlpha;
+
+            if (territory != null)
+            {
+                regionColor = (0.1f * regionColor) + (0.1f * backColor) + (0.8f * selPolityColor);
+            }
+            else
+            {
+                regionColor = (0.2f * regionColor) + (0.8f * selPolityColor);
+            }
+
+            if (IsRegionBorder(region, cell))
+            {
+                regionColor.a *= 0.8f;
+            }
+
+            color = regionColor;
+        }
+
+        return color;
+    }
+
     private static Color SetPopulationChangeOverlayColor(TerrainCell cell, Color color)
     {
-        float deltaLimitFactor = 0.1f;
+        float deltaLimitFactor = 1f;
 
         float prevPopulation = 0;
         float population = 0;
@@ -3519,6 +4409,7 @@ public class Manager
         {
             float value = delta / (population * deltaLimitFactor);
             value = Mathf.Clamp01(value);
+            value = MathUtility.ToPseudoLogaritmicScale01(value, 1);
 
             color = Color.green * value;
         }
@@ -3526,8 +4417,60 @@ public class Manager
         {
             float value = -delta / (prevPopulation * deltaLimitFactor);
             value = Mathf.Clamp01(value);
+            value = MathUtility.ToPseudoLogaritmicScale01(value, 1);
 
             color = Color.red * value;
+        }
+
+        return color;
+    }
+
+    private static Color SetMigrationPressureOverlayColor(TerrainCell cell, Color color)
+    {
+        CellGroup group = cell.Group;
+
+        if (group == null)
+        {
+            return color;
+        }
+
+        color = Color.red * group.MigrationPressure;
+
+        return color;
+    }
+
+    private static Color SetPolityMigrationPressureOverlayColor(TerrainCell cell, Color color)
+    {
+        CellGroup group = cell.Group;
+
+        if (group == null)
+        {
+            return color;
+        }
+
+        Territory territory = cell.EncompassingTerritory;
+
+        PolityProminence prominence = null;
+        Color polityColor = Color.black;
+
+        if (territory != null)
+        {
+            Polity polity = territory.Polity;
+
+            polityColor = GenerateColorFromId(polity.Id);
+            prominence = group.GetPolityProminence(polity);
+        }
+
+        if (prominence != null)
+        {
+            float nonPolPressure = group.MigrationPressure - prominence.MigrationPressure;
+            Color pColor = (Color.white * nonPolPressure) + (polityColor * prominence.MigrationPressure);
+
+            color = (0.5f * polityColor) + (0.5f * pColor);
+        }
+        else
+        {
+            color = Color.red * group.MigrationPressure * 0.5f;
         }
 
         return color;
@@ -3540,9 +4483,11 @@ public class Manager
 
         float maxPopFactor = cell.MaxAreaPercent * maxPopulation.Value / 5f;
 
+        float population = 0;
+
         if (cell.Group != null)
         {
-            float population = cell.Group.Population;
+            population = cell.Group.Population;
 
             if (cell.Group.MigrationTagged && DisplayMigrationTaggedGroup)
                 return Color.green;
@@ -3554,7 +4499,11 @@ public class Manager
 
             if (population > 0)
             {
-                float value = (population + maxPopFactor) / (maxPopulation.Value + maxPopFactor);
+                //float value = (population + maxPopFactor) / (maxPopulation.Value + maxPopFactor);
+                float value = population / maxPopulation.Value;
+
+                // Use logaritmic scale (TODO: Make this optional)
+                value = MathUtility.ToPseudoLogaritmicScale01(value, 1f);
 
                 color = Color.red * value;
             }
@@ -3583,9 +4532,9 @@ public class Manager
 
     private static Color SetPopCulturalPreferenceOverlayColor(TerrainCell cell, Color color)
     {
-        if (_planetOverlaySubtype == "None")
+        if (_planetOverlaySubtype == NoOverlaySubtype)
             return color;
-        
+
         if (cell.Group != null)
         {
             if ((cell.Group.Population > 0) &&
@@ -3594,22 +4543,29 @@ public class Manager
                 color = GetPopCulturalAttributeOverlayColor(preference.Value);
             }
         }
-        
+
         return color;
     }
 
     private static Color SetPolityCulturalPreferenceOverlayColor(TerrainCell cell, Color color)
     {
-        if (cell.Group == null)
-            return color;
+        if (_planetOverlaySubtype == NoOverlaySubtype)
+        {
+            if (cell.Group == null)
+                return color;
 
-        if (_planetOverlaySubtype == "None")
             return GetUnincorporatedGroupColor();
+        }
 
         Territory territory = cell.EncompassingTerritory;
 
         if (territory == null)
+        {
+            if (cell.Group == null)
+                return color;
+
             return GetUnincorporatedGroupColor();
+        }
 
         CulturalPreference preference = territory.Polity.Culture.GetPreference(_planetOverlaySubtype);
 
@@ -3617,18 +4573,54 @@ public class Manager
             return GetUnincorporatedGroupColor();
 
         color = GetPolityCulturalAttributeOverlayColor(preference.Value, IsTerritoryBorder(territory, cell));
-        
+
+        return color;
+    }
+
+    private static Color SetPolityAdminCostOverlayColor(TerrainCell cell, Color color)
+    {
+        Territory territory = cell.EncompassingTerritory;
+
+        if (territory == null)
+        {
+            if (cell.Group == null)
+                return color;
+
+            return GetUnincorporatedGroupColor();
+        }
+
+        float adminCost =
+            Mathf.Min(territory.Polity.TotalAdministrativeCost, Polity.MaxAdminCost);
+
+        if (CurrentMaxAdminCost < adminCost)
+            CurrentMaxAdminCost = adminCost;
+
+        float value = 0;
+        if (adminCost > 0)
+        {
+            value = adminCost / CurrentMaxAdminCost;
+            value = MathUtility.ToPseudoLogaritmicScale01(value, 1f);
+        }
+
+        Color baseColor = GetUnincorporatedGroupColor();
+
+        color = IsTerritoryBorder(territory, cell) ? new Color(1, 0.75f, 0f) : Color.yellow;
+
+        value = 0.25f + 0.75f * Mathf.Clamp01(value);
+
+        color = (baseColor * (1 - value)) + (color * value);
+
         return color;
     }
 
     private static Color SetPopCulturalActivityOverlayColor(TerrainCell cell, Color color)
     {
-        if (_planetOverlaySubtype == "None")
+        if (_planetOverlaySubtype == NoOverlaySubtype)
             return color;
-        
+
         if (cell.Group != null)
         {
-            if ((cell.Group.Population > 0) && 
+            if ((cell.Group.Population > 0) &&
                 cell.Group.Culture.GetActivity(_planetOverlaySubtype) is CellCulturalActivity activity)
             {
                 if (activity.Contribution > 0)
@@ -3643,16 +4635,23 @@ public class Manager
 
     private static Color SetPolityCulturalActivityOverlayColor(TerrainCell cell, Color color)
     {
-        if (cell.Group == null)
-            return color;
+        if (_planetOverlaySubtype == NoOverlaySubtype)
+        {
+            if (cell.Group == null)
+                return color;
 
-        if (_planetOverlaySubtype == "None")
             return GetUnincorporatedGroupColor();
+        }
 
         Territory territory = cell.EncompassingTerritory;
 
         if (territory == null)
+        {
+            if (cell.Group == null)
+                return color;
+
             return GetUnincorporatedGroupColor();
+        }
 
         CulturalActivity activity = territory.Polity.Culture.GetActivity(_planetOverlaySubtype);
 
@@ -3666,12 +4665,12 @@ public class Manager
 
     private static Color SetPopCulturalSkillOverlayColor(TerrainCell cell, Color color)
     {
-        if (_planetOverlaySubtype == "None")
+        if (_planetOverlaySubtype == NoOverlaySubtype)
             return color;
-        
+
         if (cell.Group != null)
         {
-            if ((cell.Group.Population > 0) && 
+            if ((cell.Group.Population > 0) &&
                 cell.Group.Culture.GetSkill(_planetOverlaySubtype) is CellCulturalSkill skill)
             {
                 if (skill.Value >= 0.001)
@@ -3686,16 +4685,23 @@ public class Manager
 
     private static Color SetPolityCulturalSkillOverlayColor(TerrainCell cell, Color color)
     {
-        if (cell.Group == null)
-            return color;
-        
-        if (_planetOverlaySubtype == "None")
+        if (_planetOverlaySubtype == NoOverlaySubtype)
+        {
+            if (cell.Group == null)
+                return color;
+
             return GetUnincorporatedGroupColor();
+        }
 
         Territory territory = cell.EncompassingTerritory;
 
         if (territory == null)
+        {
+            if (cell.Group == null)
+                return color;
+
             return GetUnincorporatedGroupColor();
+        }
 
         CulturalSkill skill = territory.Polity.Culture.GetSkill(_planetOverlaySubtype);
 
@@ -3709,20 +4715,22 @@ public class Manager
 
     private static Color SetPopCulturalKnowledgeOverlayColor(TerrainCell cell, Color color)
     {
-        if (_planetOverlaySubtype == "None")
+        if (_planetOverlaySubtype == NoOverlaySubtype)
             return color;
-        
+
         if (cell.Group != null)
         {
-            if ((cell.Group.Population > 0) && 
-                cell.Group.Culture.GetKnowledge(_planetOverlaySubtype) is CellCulturalKnowledge knowledge)
+            if ((cell.Group.Population > 0) &&
+                Knowledge.GetKnowledge(_planetOverlaySubtype) is var knowledge)
             {
-                float highestLimit = knowledge.GetHighestLimit();
+                float highestLimitValue = knowledge.HighestLimitValue;
 
-                if (highestLimit <= 0)
-                    throw new System.Exception("Highest Limit is less or equal to 0");
+                if (highestLimitValue <= 0)
+                    throw new System.Exception("Highest limit value is less or equal to 0");
 
-                float normalizedValue = knowledge.Value / highestLimit;
+                var value = cell.Group.Culture.GetKnowledgeValue(_planetOverlaySubtype);
+
+                float normalizedValue = value / highestLimitValue;
 
                 if (normalizedValue >= 0.001f)
                 {
@@ -3736,31 +4744,38 @@ public class Manager
 
     private static Color SetPolityCulturalKnowledgeOverlayColor(TerrainCell cell, Color color)
     {
-        if (cell.Group == null)
-            return color;
+        if (_planetOverlaySubtype == NoOverlaySubtype)
+        {
+            if (cell.Group == null)
+                return color;
 
-        if (_planetOverlaySubtype == "None")
             return GetUnincorporatedGroupColor();
+        }
 
         Territory territory = cell.EncompassingTerritory;
 
         if (territory == null)
+        {
+            if (cell.Group == null)
+                return color;
+
+            return GetUnincorporatedGroupColor();
+        }
+
+        var tKnowledge = territory.Polity.Culture.GetKnowledge(_planetOverlaySubtype);
+
+        if (tKnowledge == null)
             return GetUnincorporatedGroupColor();
 
-        CulturalKnowledge knowledge = territory.Polity.Culture.GetKnowledge(_planetOverlaySubtype);
-        
-        if (knowledge == null)
+        if (!(Knowledge.GetKnowledge(_planetOverlaySubtype) is var knowledge))
             return GetUnincorporatedGroupColor();
 
-        if (!(territory.Polity.CoreGroup.Culture.GetKnowledge(_planetOverlaySubtype) is CellCulturalKnowledge cellKnowledge))
-            return GetUnincorporatedGroupColor();
+        float highestLimitValue = knowledge.HighestLimitValue;
 
-        float highestLimit = cellKnowledge.GetHighestLimit();
+        if (highestLimitValue <= 0)
+            throw new System.Exception("Highest limit value is less or equal to 0");
 
-        if (highestLimit <= 0)
-            throw new System.Exception("Highest Limit is less or equal to 0");
-
-        float normalizedValue = knowledge.Value / highestLimit;
+        float normalizedValue = tKnowledge.Value / highestLimitValue;
         color = GetPolityCulturalAttributeOverlayColor(normalizedValue, IsTerritoryBorder(territory, cell));
 
         return color;
@@ -3768,9 +4783,9 @@ public class Manager
 
     private static Color SetPopCulturalDiscoveryOverlayColor(TerrainCell cell, Color color)
     {
-        if (_planetOverlaySubtype == "None")
+        if (_planetOverlaySubtype == NoOverlaySubtype)
             return color;
-        
+
         if (cell.Group != null)
         {
             if ((cell.Group.Population > 0) && cell.Group.Culture.HasDiscovery(_planetOverlaySubtype))
@@ -3784,16 +4799,23 @@ public class Manager
 
     private static Color SetPolityCulturalDiscoveryOverlayColor(TerrainCell cell, Color color)
     {
-        if (cell.Group == null)
-            return color;
+        if (_planetOverlaySubtype == NoOverlaySubtype)
+        {
+            if (cell.Group == null)
+                return color;
 
-        if (_planetOverlaySubtype == "None")
             return GetUnincorporatedGroupColor();
+        }
 
         Territory territory = cell.EncompassingTerritory;
 
         if (territory == null)
+        {
+            if (cell.Group == null)
+                return color;
+
             return GetUnincorporatedGroupColor();
+        }
 
         if (!territory.Polity.Culture.HasDiscovery(_planetOverlaySubtype))
             return GetUnincorporatedGroupColor();
@@ -3866,7 +4888,7 @@ public class Manager
 
     private static Color SetBiomeTraitPresenceOverlayColor(TerrainCell cell, Color color)
     {
-        if (_planetOverlaySubtype == "None")
+        if (_planetOverlaySubtype == NoOverlaySubtype)
             return color;
 
         color = GetLowMedHighColor(cell.GetBiomeTraitPresence(_planetOverlaySubtype) * (1 - cell.FarmlandPercentage));
@@ -3898,11 +4920,11 @@ public class Manager
         color = Color.black;
         color.a = baseAlpha;
 
-        if (_planetOverlaySubtype == "None")
+        if (_planetOverlaySubtype == NoOverlaySubtype)
             return color;
 
         Layer layer = Layer.Layers[_planetOverlaySubtype];
-        
+
         float normalizedValue = cell.GetLayerValue(_planetOverlaySubtype);
         normalizedValue = normalizedValue / layer.MaxPresentValue;
 
@@ -3936,7 +4958,7 @@ public class Manager
         bool hasGroup = false;
         bool inTerritory = false;
         Color densityColorSubOptimal = GetOverlayColor(OverlayColorId.GeneralDensitySubOptimal);
-        Color groupColor = GetOverlayColor(OverlayColorId.GeneralDensityOptimal);
+        Color cellColor = GetOverlayColor(OverlayColorId.GeneralDensityOptimal);
 
         if (cell.EncompassingTerritory != null)
         {
@@ -3944,20 +4966,21 @@ public class Manager
 
             Polity territoryPolity = cell.EncompassingTerritory.Polity;
 
-            groupColor = GenerateColorFromId(territoryPolity.Id, 100);
+            cellColor = GenerateColorFromId(territoryPolity.Id);
 
             bool isTerritoryBorder = IsTerritoryBorder(cell.EncompassingTerritory, cell);
-            bool isCoreGroup = territoryPolity.CoreGroup == cell.Group;
+            bool isCoreGroup =
+                (cell.Group != null) && (territoryPolity.CoreGroup == cell.Group);
 
             if (!isCoreGroup)
             {
                 if (!isTerritoryBorder)
                 {
-                    groupColor /= 2.5f;
+                    cellColor /= 2.5f;
                 }
                 else
                 {
-                    groupColor /= 1.75f;
+                    cellColor /= 1.75f;
                 }
             }
         }
@@ -3968,30 +4991,37 @@ public class Manager
 
             if (!inTerritory)
             {
-                if (cell.Group.Culture.TryGetKnowledgeValue(SocialOrganizationKnowledge.KnowledgeId, out int knowledgeValue))
+                if (cell.Group.Culture == null)
                 {
-                    float minValue = SocialOrganizationKnowledge.MinValueForTribeFormation;
+                    throw new System.NullReferenceException($"Group {cell.Position} culture not initialized...");
+                }
+
+                if (cell.Group.Culture.TryGetKnowledgeValue(SocialOrganizationKnowledge.KnowledgeId, out var knowledgeValue))
+                {
+                    float minValue = TribeFormationEvent.MinSocialOrganizationKnowledgeValue * 2;
                     float startValue = SocialOrganizationKnowledge.InitialValue;
 
                     float knowledgeFactor = Mathf.Clamp01((knowledgeValue - startValue) / (minValue - startValue));
-                    
-                    groupColor = (groupColor * knowledgeFactor) + densityColorSubOptimal * (1f - knowledgeFactor);
+
+                    //Experimenting
+                    cellColor = knowledgeValue<3?densityColorSubOptimal:cellColor;
+                    //cellColor = (cellColor * knowledgeFactor) + densityColorSubOptimal * (1f - knowledgeFactor);
                 }
                 else
                 {
-                    groupColor = densityColorSubOptimal;
+                    cellColor = densityColorSubOptimal;
                 }
             }
         }
 
         if (hasGroup && !inTerritory)
         {
-            baseColor = groupColor;
+            baseColor = cellColor;
             baseColor.a = 0.5f;
         }
         else if (inTerritory)
         {
-            baseColor = groupColor;
+            baseColor = cellColor;
             baseColor.a = 0.85f;
         }
 
@@ -4011,16 +5041,14 @@ public class Manager
             long nextUpdateDate = cell.Group.NextUpdateDate;
             long updateSpan = nextUpdateDate - lastUpdateDate;
 
-            if (_manager._currentMaxUpdateSpan < updateSpan)
-                _manager._currentMaxUpdateSpan = updateSpan;
+            if (CurrentMaxUpdateSpan < updateSpan)
+                CurrentMaxUpdateSpan = updateSpan;
 
-            float maxUpdateSpan = CellGroup.MaxUpdateSpan;
+            float maxUpdateSpan =
+                Mathf.Min(CurrentMaxUpdateSpan, CellGroup.MaxUpdateSpan);
 
-            maxUpdateSpan = Mathf.Min(_manager._currentMaxUpdateSpan, maxUpdateSpan);
-
-            normalizedValue = 1f - updateSpan / maxUpdateSpan;
-
-            normalizedValue = Mathf.Clamp01(normalizedValue);
+            normalizedValue = Mathf.Clamp01(updateSpan / maxUpdateSpan);
+            normalizedValue = 1 - MathUtility.ToPseudoLogaritmicScale01(normalizedValue, 1f);
         }
 
         if ((population > 0) && (normalizedValue > 0))
@@ -4031,11 +5059,56 @@ public class Manager
         return color;
     }
 
+    private static Color SetMigrationOverlayColor(TerrainCell cell, Color color)
+    {
+        if ((cell.Group != null)
+            && (cell.Group.LastPopulationMigration != null)
+            && (cell.Group.LastPopulationMigration.EndDate > LastTextureUpdateDate))
+        {
+            MigratingPopulationSnapshot migrationPop = cell.Group.LastPopulationMigration;
+
+            if (migrationPop.PolityId != null)
+            {
+                color = GenerateColorFromId(migrationPop.PolityId);
+            }
+            else
+            {
+                color = Color.gray;
+            }
+        }
+        else if (cell.EncompassingTerritory != null)
+        {
+            Polity territoryPolity = cell.EncompassingTerritory.Polity;
+
+            color = GenerateColorFromId(territoryPolity.Id);
+            color *= 0.5f;
+        }
+        else if (cell.Group != null)
+        {
+            color = GetUnincorporatedGroupColor();
+        }
+
+        return color;
+    }
+
+    private static Color SetDateofArrivalOverlayColor(TerrainCell cell, Color color)
+    {
+
+        if(cell.Group != null)
+        {
+            float value = (float)cell.Group.DateofHumanArrival / CurrentWorld.CurrentDate;
+
+            color = new Color(value, value/2f, 1f-value);
+        }
+
+        return color;
+    }
+
     private static Color SetTemperatureOverlayColor(TerrainCell cell, Color color)
     {
         float span = World.MaxPossibleTemperature - World.MinPossibleTemperature;
 
-        float value = (cell.Temperature - (World.MinPossibleTemperature + TemperatureOffset)) / span;
+        float value = (cell.Temperature - (World.MinPossibleTemperature + Manager.TemperatureOffset)) / span;
 
         color = new Color(value, 0, 1f - value)
         {
@@ -4104,10 +5177,6 @@ public class Manager
         return color;
     }
 
-    /// <summary>Enables the XmlSerializer to override the default way of serializing a set of objects.</summary>
-    /// <returns>
-    ///   The newly instantiated XmlAttributeOverrides object.
-    /// </returns>
     private static XmlAttributeOverrides GenerateAttributeOverrides()
     {
         XmlAttributeOverrides attrOverrides = new XmlAttributeOverrides();
@@ -4117,21 +5186,55 @@ public class Manager
 
     public static Texture2D LoadTexture(string path)
     {
-        if (!File.Exists(path))
-            return null;
-
-        byte[] data = File.ReadAllBytes(path);
-
-        Texture2D texture = new Texture2D(1, 1);
-
-        return texture.LoadImage(data) ? texture : null;
+        if (MainThread == Thread.CurrentThread)
+        {
+            return LoadTextureInternal(path);
+        }
+        else
+        {
+            // we need to execute this operation in the main thread...
+            return EnqueueTask(() => LoadTextureInternal(path));
+        }
     }
 
-    /// <summary>Determines if the given <c>texture</c> is valid.</summary>
-    /// <param name="texture">The texture to be validated.</param>
-    /// <returns>
-    ///   The <c>TextureValidationResult</c> which will be 1 for not valid or 0 for valid.
-    /// </returns>
+    private static Texture2D LoadTextureInternal(string path)
+    {
+        Texture2D texture;
+
+        if (File.Exists(path))
+        {
+            byte[] data = File.ReadAllBytes(path);
+            texture = new Texture2D(1, 1);
+            if (texture.LoadImage(data))
+                return texture;
+        }
+
+        return null;
+    }
+
+    public static Sprite CreateSprite(Texture2D texture)
+    {
+        if (MainThread == Thread.CurrentThread)
+        {
+            return CreateSpriteInternal(texture);
+        }
+        else
+        {
+            // we need to execute this operation in the main thread...
+            return EnqueueTask(() => CreateSpriteInternal(texture));
+        }
+    }
+
+    private static Sprite CreateSpriteInternal(Texture2D texture)
+    {
+        Sprite sprite = Sprite.Create(
+            texture,
+            new Rect(0, 0, texture.width, texture.height),
+            new Vector2(0.5f, 0.5f));
+
+        return sprite;
+    }
+
     public static TextureValidationResult ValidateTexture(Texture2D texture)
     {
         if ((texture.width < WorldWidth) && (texture.height < WorldHeight))
@@ -4142,15 +5245,16 @@ public class Manager
         return TextureValidationResult.Ok;
     }
 
-    /// <summary>Loads the mods from a given <c>path</c>.</summary>
-    /// <param name="paths">The list of paths to load the mods from.</param>
     public static void LoadMods(ICollection<string> paths)
     {
         if (paths.Count == 0)
             throw new System.ArgumentException("Number of mods to load can't be zero");
 
         World.ResetStaticModData();
+
         CellGroup.ResetEventGenerators();
+        Faction.ResetEventGenerators();
+        Polity.ResetEventGenerators();
 
         Layer.ResetLayers();
         Biome.ResetBiomes();
@@ -4159,70 +5263,134 @@ public class Manager
         RegionAttribute.ResetAttributes();
         Element.ResetElements();
 
+        CurrentDiscoveryUid = 0;
         Discovery.ResetDiscoveries();
+        Discovery033.ResetDiscoveries();
         Knowledge.ResetKnowledges();
+        CulturalSkill.ResetSkills();
+        CulturalActivity.ResetActivities();
+
+        PreferenceGenerator.ResetPreferenceGenerators();
+        EventGenerator.ResetGenerators();
+
+        ActionCategory.ResetActionCategories();
+        ModAction.ResetActions();
+
+        ModDecision.ResetDecisions();
+
+        CulturalActivity.InitializeActivities();
+        CulturalSkill.InitializeBaseSkills();
+        Knowledge.InitializeKnowledges();
 
         float progressPerMod = 0.1f / paths.Count;
 
         foreach (string path in paths)
         {
-            if (_manager._progressCastMethod != null)
+            if (_progressCastMethod != null)
             {
                 string directoryName = Path.GetFileName(path);
 
-                _manager._progressCastMethod(LastStageProgress, "Loading Mod '" + directoryName + "'...");
+                _progressCastMethod(LastStageProgress, "Loading Mod '" + directoryName + "'...");
             }
 
-            LoadMod(path + @"\", progressPerMod);
+            LoadMod(path, progressPerMod);
 
             LastStageProgress += progressPerMod;
         }
 
-        Knowledge.InitializeKnowledges();
-        Discovery.InitializeDiscoveries();
+        PreferenceGenerator.InitializePreferenceGenerators();
+        Discovery033.InitializeDiscoveries();
+
+        EventGenerator.InitializeGenerators();
     }
 
     delegate void LoadModFileDelegate(string filename);
 
-    /// <summary>Tries to load the mod files of a particular type.</summary>
-    /// <param name="loadModFile">The delegate for loading a particular mod file.</param>
-    /// <param name="path">The path to the mod files trying to be loaded.</param>
-    /// <param name="progressPerModSegment">The progress per mod segment value.</param>
-    private static void TryLoadModFiles(LoadModFileDelegate loadModFile, string path, float progressPerModSegment)
+    private static void TryLoadModFiles(
+        LoadModFileDelegate loadModFile,
+        string path,
+        float progressPerModSegment)
     {
         if (!Directory.Exists(path))
             return;
 
         string[] files = Directory.GetFiles(path, "*.json");
 
-        if (files.Length <= 0)
-            return;
-
-        float progressPerFile = progressPerModSegment / files.Length;
-        float accProgress = LastStageProgress;
-
-        foreach (string file in files)
+        if (files.Length > 0)
         {
-            loadModFile(file);
+            float progressPerFile = progressPerModSegment / files.Length;
+            float accProgress = LastStageProgress;
 
-            accProgress += progressPerFile;
+            foreach (string file in files)
+            {
+                loadModFile(file);
 
-            _manager._progressCastMethod?.Invoke(accProgress);
+                accProgress += progressPerFile;
+
+                _progressCastMethod?.Invoke(accProgress);
+            }
         }
     }
 
-    /// <summary>Loads the mod at the location identified by <c>path</c>.</summary>
-    /// <param name="path">The path from where to load the mod.</param>
-    /// <param name="progressPerMod">The progress value per mod.</param>
     private static void LoadMod(string path, float progressPerMod)
     {
+        string version = ModVersionReader.GetLoaderVersion(path);
+
+        if (version.StartsWith(ModVersionReader.LoaderVersion033))
+        {
+            LoadMod033(path, progressPerMod);
+        }
+        else if (version.StartsWith(ModVersionReader.LoaderVersion034))
+        {
+            LoadMod034(path, progressPerMod);
+        }
+        else
+        {
+            throw new System.Exception("Unsupported mod version: " + version);
+        }
+    }
+
+    private static void LoadMod034(string path, float progressPerMod)
+    {
+        if (!Directory.Exists(path))
+        {
+            throw new System.ArgumentException("Mod path '" + path + "' not found");
+        }
+
+        float progressPerSegment = progressPerMod / 11f;
+
+        TryLoadModFiles(Layer.LoadLayersFile033, Path.Combine(path, @"Layers"), progressPerSegment);
+        TryLoadModFiles(Biome.LoadBiomesFile033, Path.Combine(path, @"Biomes"), progressPerSegment);
+        TryLoadModFiles(Adjective.LoadAdjectivesFile033, Path.Combine(path, @"Adjectives"), progressPerSegment);
+        TryLoadModFiles(RegionAttribute.LoadRegionAttributesFile033, Path.Combine(path, @"RegionAttributes"), progressPerSegment);
+        TryLoadModFiles(Element.LoadElementsFile033, Path.Combine(path, @"Elements"), progressPerSegment);
+        TryLoadModFiles(PreferenceGenerator.LoadPreferencesFile, Path.Combine(path, @"Preferences"), progressPerSegment);
+        TryLoadModFiles(Discovery.LoadDiscoveriesFile, Path.Combine(path, @"Discoveries"), progressPerSegment);
+        TryLoadModFiles(EventGenerator.LoadEventFile, Path.Combine(path, @"Events"), progressPerSegment);
+        TryLoadModFiles(ActionCategory.LoadActionCategoryFile, Path.Combine(path, @"Actions", @"Categories"), progressPerSegment);
+        TryLoadModFiles(ModAction.LoadActionFile, Path.Combine(path, @"Actions"), progressPerSegment);
+        TryLoadModFiles(ModDecision.LoadDecisionFile, Path.Combine(path, @"Decisions"), progressPerSegment);
+    }
+
+    private static void LoadMod033(string path, float progressPerMod)
+    {
+        if (!Directory.Exists(path))
+        {
+            throw new System.ArgumentException("Mod path '" + path + "' not found");
+        }
+
         float progressPerSegment = progressPerMod / 6f;
 
-        TryLoadModFiles(Layer.LoadLayersFile, path + @"Layers", progressPerSegment);
-        TryLoadModFiles(Biome.LoadBiomesFile, path + @"Biomes", progressPerSegment);
-        TryLoadModFiles(Adjective.LoadAdjectivesFile, path + @"Adjectives", progressPerSegment);
-        TryLoadModFiles(RegionAttribute.LoadRegionAttributesFile, path + @"RegionAttributes", progressPerSegment);
-        TryLoadModFiles(Element.LoadElementsFile, path + @"Elements", progressPerSegment);
-        TryLoadModFiles(Discovery.LoadDiscoveriesFile, path + @"Discoveries", progressPerSegment);
+        TryLoadModFiles(Layer.LoadLayersFile033, Path.Combine(path, @"Layers"), progressPerSegment);
+        TryLoadModFiles(Biome.LoadBiomesFile033, Path.Combine(path, @"Biomes"), progressPerSegment);
+        TryLoadModFiles(Adjective.LoadAdjectivesFile033, Path.Combine(path, @"Adjectives"), progressPerSegment);
+        TryLoadModFiles(RegionAttribute.LoadRegionAttributesFile033, Path.Combine(path, @"RegionAttributes"), progressPerSegment);
+        TryLoadModFiles(Element.LoadElementsFile033, Path.Combine(path, @"Elements"), progressPerSegment);
+        TryLoadModFiles(Discovery033.LoadDiscoveriesFile033, Path.Combine(path, @"Discoveries"), progressPerSegment);
+    }
+
+    public static void InvokeGuidedFactionStatusChangeEvent()
+    {
+        EventManager.GuidedFactionStatusChange.Invoke();
     }
 }

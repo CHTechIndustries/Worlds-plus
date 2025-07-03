@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
 
 public class SaveLoadTestSettings
 {
@@ -221,7 +222,7 @@ public class SaveLoadTest : AutomatedTest
 
                     Manager.UpdateMainThreadReference();
 
-                    _savePath = Manager.SavePath + "TestSaveLoad.plnt";
+                    _savePath = Path.Combine(Manager.SavePath, "TestSaveLoad.plnt");
 
                     Debug.Log("Generating world " + _seed + "...");
                     
@@ -356,7 +357,7 @@ public class SaveLoadTest : AutomatedTest
                 _totalCallsToGroupUpdate = 0;
 
 #if DEBUG
-                World.AddMigratingGroupCalled = () =>
+                World.AddMigratingPopulationCalled = () =>
                 {
                     _totalCallsToAddMigratingGroup++;
                 };
@@ -696,7 +697,7 @@ public class SaveLoadTest : AutomatedTest
                 _totalCallsToGroupUpdate = 0;
 
 #if DEBUG
-                World.AddMigratingGroupCalled = () =>
+                World.AddMigratingPopulationCalled = () =>
                 {
                     _totalCallsToAddMigratingGroup++;
                 };
@@ -1244,7 +1245,7 @@ public class SaveLoadTest : AutomatedTest
                 Manager.TrackGenRandomCallers = false;
                 Manager.RegisterDebugEvent = null;
                 World.AddGroupToUpdateCalled = null;
-                World.AddMigratingGroupCalled = null;
+                World.AddMigratingPopulationCalled = null;
                 CellGroup.UpdateCalled = null;
                 TerrainCell.GetNextLocalRandomCalled = null;
 #endif

@@ -44,12 +44,19 @@ public class WorldCustomizationDialogPanelScript : MenuPanelScript
 
     public void SeedValueChange()
     {
+        if (SeedInputField.text == string.Empty)
+        {
+            GenerateButton.interactable = false;
+            return;
+        }
+
         if (int.TryParse(SeedInputField.text, out int value))
         {
             _previousInputValue = value;
         }
 
         SeedInputField.text = _previousInputValue.ToString();
+        GenerateButton.interactable = true;
     }
 
     public void SetImageLoadingPaneState(bool state)
@@ -124,9 +131,7 @@ public class WorldCustomizationDialogPanelScript : MenuPanelScript
 
     private void SetActiveModsAction()
     {
-        ICollection<string> paths = LoadFileDialogPanel.GetPathsToLoad();
-
-        Manager.SetActiveModPaths(paths);
+        Manager.SetActiveModPaths(LoadFileDialogPanel.GetPathsToLoad());
         Manager.ResetLayerSettings();
 
         SetVisible(true);

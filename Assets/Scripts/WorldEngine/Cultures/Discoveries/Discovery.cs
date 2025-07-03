@@ -4,110 +4,36 @@ using System.Collections.Generic;
 using System.Xml;
 using System.Xml.Serialization;
 
-public class Discovery : ICellGroupEventGenerator
+public class Discovery : Context, IDiscovery, IEffectTrigger
 {
-    public class Event : CellGroupEventGeneratorEvent
-    {
-        private Discovery _discovery;
+    public const string TargetEntityId = "target";
 
-        public Event()
-        {
-        }
+    public string Name { get; set; }
+    public int UId { get; set; }
 
-        public Event(
-            Discovery discovery,
-            CellGroup group,
-            long triggerDate,
-            long eventTypeId) :
-            base(discovery, group, triggerDate, eventTypeId)
-        {
-            _discovery = discovery;
-        }
+    /// <summary>
+    /// Effects to occur when the discovery is gained
+    /// </summary>
+    public IEffectExpression[] GainEffects;
 
-        private void TryGenerateEventMessage()
-        {
-            DiscoveryEventMessage eventMessage = null;
-
-            World world = Group.World;
-            TerrainCell cell = Group.Cell;
-
-            if (!world.HasEventMessage(_discovery.UId))
-            {
-                eventMessage = new DiscoveryEventMessage(_discovery, cell, _discovery.UId, TriggerDate);
-
-                world.AddEventMessage(eventMessage);
-            }
-
-            if (cell.EncompassingTerritory != null)
-            {
-                Polity encompassingPolity = cell.EncompassingTerritory.Polity;
-
-                if (!encompassingPolity.HasEventMessage(_discovery.UId))
-                {
-                    if (eventMessage == null)
-                        eventMessage = new DiscoveryEventMessage(_discovery, cell, _discovery.UId, TriggerDate);
-
-                    encompassingPolity.AddEventMessage(eventMessage);
-                }
-            }
-        }
-
-        public override void Trigger()
-        {
-            Group.Culture.AddDiscoveryToFind(_discovery);
-
-            Group.World.AddGroupToUpdate(Group);
-
-            TryGenerateEventMessage();
-        }
-
-        public override bool CanTrigger()
-        {
-            if (!base.CanTrigger())
-                return false;
-
-            return _discovery.CanBeGained(Group);
-        }
-
-        public override void FinalizeLoad()
-        {
-            base.FinalizeLoad();
-
-            _discovery = Generator as Discovery;
-        }
-    }
+    /// <summary>
+    /// Effects to occur when the discovery is lost
+    /// </summary>
+    public IEffectExpression[] LossEffects;
 
     public static Dictionary<string, Discovery> Discoveries;
 
-    public static int CurrentUId = 0;
-    
-    public string Id;
-    public string Name;
-
-    public string EventGeneratorId;
-
-    public int IdHash;
-    public int UId; // Do not use as seed or part of (no consistency guarantee after reload). TODO: Get rid of it if possible
-    public string EventSetFlag;
-
-    public Condition[] GainConditions = null;
-    public Condition[] HoldConditions = null;
-
-    public Effect[] GainEffects = null;
-    public Effect[] LossEffects = null;
-
-    public long EventTimeToTrigger;
-    public Factor[] EventTimeToTriggerFactors = null;
-
-    public static void ResetDiscoveries()
-    {
-        Discoveries = new Dictionary<string, Discovery>();
-    }
+    private readonly GroupEntity _target;
 
     public static void LoadDiscoveriesFile(string filename)
     {
         foreach (Discovery discovery in DiscoveryLoader.Load(filename))
         {
+            if (Discovery033.Discoveries.ContainsKey(discovery.Id))
+            {
+                Debug.LogWarning($"A discovery with the same Id from a 0.3.3 mod has already been loaded. Will ignore that one during gameplay");
+            }
+
             if (Discoveries.ContainsKey(discovery.Id))
             {
                 Discoveries[discovery.Id] = discovery;
@@ -119,192 +45,73 @@ public class Discovery : ICellGroupEventGenerator
         }
     }
 
-    public static void InitializeDiscoveries()
+    public static void ResetDiscoveries()
     {
-        foreach (Discovery discovery in Discoveries.Values)
-        {
-            discovery.Initialize();
-        }
+        Discoveries = new Dictionary<string, Discovery>();
     }
 
-    public static Discovery GetDiscovery(string id)
+    public Discovery()
     {
-        Discovery d;
+        DebugType = "Discovery";
 
-        if (!Discoveries.TryGetValue(id, out d))
-        {
-            return null;
-        }
+        _target = new GroupEntity(this, TargetEntityId, null);
 
-        return d;
+        // Add the target to the context's entity map
+        AddEntity(_target);
     }
 
-    public void Initialize()
+    private void SetTarget(CellGroup group)
     {
-        string eventPrefix = Id + "_discovery_event";
+        Reset();
 
-        EventGeneratorId = eventPrefix + "_generator";
-        EventSetFlag = eventPrefix + "_set";
-
-        World.EventGenerators.Add(EventGeneratorId, this);
-        CellGroup.OnSpawnEventGenerators.Add(this);
-
-        InitializeOnConditions(GainConditions);
+        _target.Set(group);
     }
 
-    private void InitializeOnConditions(Condition[] conditions)
+    private void ApplyEffects(CellGroup group, IEffectExpression[] effects)
     {
-        foreach (Condition c in conditions)
-        {
-            if ((c.ConditionType & ConditionType.Knowledge) == ConditionType.Knowledge)
-            {
-                InitializeOnKnowledgeCondition(c);
-            }
-        }
-    }
+        SetTarget(group);
 
-    private void InitializeOnKnowledgeCondition(Condition c)
-    {
-        string knowledgeIds = c.GetPropertyValue(Condition.Property_KnowledgeId);
+        OpenDebugOutput($"Applying {Name} Discovery Gain Effects:");
 
-        if (knowledgeIds == null)
+        foreach (IEffectExpression exp in effects)
         {
-            throw new System.Exception("Discovery: Knowledge condition doesn't reference any Knowledge Ids: " + c.ToString());
+            AddExpDebugOutput("Effect", exp);
+
+            exp.Trigger = this;
+            exp.Apply();
         }
 
-        string[] knowledgeIdArray = c.GetPropertyValue(Condition.Property_KnowledgeId).Split(',');
-
-        foreach (string kId in knowledgeIdArray)
-        {
-            Knowledge knowledge = Knowledge.GetKnowledge(kId);
-
-            if (knowledge == null)
-            {
-                throw new System.Exception("Discovery: Unable to find knowledge with Id: " + kId);
-            }
-
-            knowledge.OnUpdateEventGenerators.Add(this);
-        }
+        CloseDebugOutput();
     }
 
-    public bool CanBeGained(CellGroup group)
+    public void OnGain(CellGroup group) => ApplyEffects(group, GainEffects);
+    public void OnLoss(CellGroup group) => ApplyEffects(group, LossEffects);
+
+    public override float GetNextRandomFloat(int iterOffset) =>
+        _target.Group.GetNextLocalRandomFloat(iterOffset);
+
+    public override int GetNextRandomInt(int iterOffset, int maxValue) =>
+        _target.Group.GetNextLocalRandomInt(iterOffset, maxValue);
+
+    public override int GetBaseOffset() =>
+        _target.Group.GetHashCode();
+
+#if DEBUG
+    private Dictionary<IEffectExpression, long> _lastUseDates = new Dictionary<IEffectExpression, long>();
+
+    public long GetLastUseDate(IEffectExpression expression)
     {
-        if (group.Culture.HasOrWillHaveDiscovery(Id))
-            return false;
-
-        if (GainConditions == null)
-            return true;
-
-        foreach (Condition condition in GainConditions)
+        if (_lastUseDates.ContainsKey(expression))
         {
-            if (!condition.Evaluate(group))
-                return false;
+            return _lastUseDates[expression];
         }
 
-        return true;
+        return -1;
     }
 
-    public bool CanBeHeld(CellGroup group)
+    public void SetLastUseDate(IEffectExpression expression, long date)
     {
-        if (HoldConditions == null)
-            return true;
-
-        foreach (Condition condition in HoldConditions)
-        {
-            if (!condition.Evaluate(group))
-                return false;
-        }
-
-        return true;
+        _lastUseDates[expression] = date;
     }
-
-    public bool CanAssignEventTypeToGroup(CellGroup group)
-    {
-        if (group.IsFlagSet(EventSetFlag))
-            return false;
-
-        return CanBeGained(group);
-    }
-
-    private long CalculateTriggerDate(CellGroup group)
-    {
-        float randomFactor = group.GetNextLocalRandomFloat(IdHash);
-
-        float dateSpan = randomFactor * EventTimeToTrigger;
-
-        if (EventTimeToTriggerFactors != null)
-        {
-            foreach (Factor factor in EventTimeToTriggerFactors)
-            {
-                dateSpan *= factor.Calculate(group);
-            }
-        }
-
-        long targetDate = (long)(group.World.CurrentDate + dateSpan) + 1;
-
-        return targetDate;
-    }
-
-    public CellGroupEvent GenerateAndAssignEvent(CellGroup group)
-    {
-        long triggerDate = CalculateTriggerDate(group);
-
-        Event discoveryEvent = new Event(this, group, triggerDate, IdHash);
-
-        group.World.InsertEventToHappen(discoveryEvent);
-
-        return discoveryEvent;
-    }
-
-    public string GetEventGeneratorId()
-    {
-        return EventGeneratorId;
-    }
-
-    public void OnGain(CellGroup group)
-    {
-        if (GainEffects == null)
-            return;
-
-        foreach (Effect effect in GainEffects)
-        {
-            if (effect.IsDeferred())
-            {
-                effect.Defer(group);
-                continue;
-            }
-
-            effect.Apply(group);
-        }
-    }
-
-    public void OnLoss(CellGroup group)
-    {
-        if (LossEffects != null)
-        {
-            foreach (Effect effect in LossEffects)
-            {
-                if (effect.IsDeferred())
-                {
-                    effect.Defer(group);
-                    continue;
-                }
-
-                effect.Apply(group);
-            }
-        }
-    }
-
-    public void RetryAssignAfterLoss(CellGroup group)
-    {
-        if (CanAssignEventTypeToGroup(group))
-        {
-            GenerateAndAssignEvent(group);
-        }
-    }
-
-    public string GetEventSetFlag()
-    {
-        return EventSetFlag;
-    }
+#endif
 }

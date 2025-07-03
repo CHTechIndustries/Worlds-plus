@@ -4,15 +4,54 @@ using System.Collections.Generic;
 
 public static class MathUtility
 {
-    public const int FloatToIntScalingFactor = 100;
-    public const float IntToFloatScalingFactor = 1f / FloatToIntScalingFactor;
-
     public const float NormalAt0 = 0.398942f;
     public const float NormalAt1 = 0.241971f;
     public const float NormalAt2 = 0.053991f;
     public const float NormalAt3 = 0.004432f;
     public const float NormalAt4 = 0.000134f;
     public const float NormalAt5 = 0.000001f;
+
+    /// <summary>
+    /// Parses a float number using a culture invariant format.
+    /// </summary>
+    /// <param name="s">
+    /// The float number string to parse.
+    /// </param>
+    /// <param name="result">
+    /// (out paramenter) The float where to copy the parsed value.
+    /// </param>
+    /// <returns>
+    ///   <c>true</c> if the string could be parsed into a float value correctly. Otherwise, <c>false</c>.
+    /// </returns>
+    public static bool TryParseCultureInvariant(string s, out float result)
+    {
+        return float.TryParse(
+            s, 
+            System.Globalization.NumberStyles.Float, 
+            System.Globalization.CultureInfo.InvariantCulture, 
+            out result);
+    }
+
+    /// <summary>
+    /// Parses an integer number using a culture invariant format.
+    /// </summary>
+    /// <param name="s">
+    /// The integer number string to parse.
+    /// </param>
+    /// <param name="result">
+    /// (out paramenter) The integer where to copy the parsed value.
+    /// </param>
+    /// <returns>
+    ///   <c>true</c> if the string could be parsed into a integer value correctly. Otherwise, <c>false</c>.
+    /// </returns>
+    public static bool TryParseCultureInvariant(string s, out int result)
+    {
+        return int.TryParse(
+            s,
+            System.Globalization.NumberStyles.Integer,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out result);
+    }
 
     public static bool IsInsideRange(this float value, float minValue, float maxValue)
     {
@@ -27,6 +66,16 @@ public static class MathUtility
     public static bool IsInsideRange(this long value, long minValue, long maxValue)
     {
         return (value >= minValue) && (value <= maxValue);
+    }
+
+    public static int ProtectedAbs(int x)
+    {
+        if (x == int.MinValue)
+        {
+            return int.MaxValue;
+        }
+
+        return Mathf.Abs(x);
     }
 
     public static float GetMagnitude(float c1, float c2)
@@ -87,9 +136,12 @@ public static class MathUtility
     public static float RoundToSixDecimals(float value)
     {
 #if DEBUG
-        if ((value < 0) || (value > 1))
+        if (!value.IsInsideRange(0,1))
         {
-            Debug.LogWarning("This function is meant to be used only with values between 0 and 1. Value = " + value);
+            System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace();
+
+            Debug.LogWarning("This function is meant to be used only with values between 0 and 1. Value = " +
+                value + ", stackTrace:\n" + stackTrace);
         }
 #endif
 
@@ -126,6 +178,82 @@ public static class MathUtility
         decimals = ab - pab;
 
         return pab;
+    }
+
+    /// <summary>
+    /// Given b, c and f, return the original value for 'a' in c = lerp(a,b,f)
+    /// NOTE: This is not the same as InverseLerp, which solves the equation for 'f'...
+    /// </summary>
+    /// <param name="c">The output of lerp(a,b,f)</param>
+    /// <param name="b">The second input from lerp(a,b,f)</param>
+    /// <param name="f">the lerp percentage</param>
+    /// <returns>The first input from lerp(a,b,f)</returns>
+    public static int ReverseLerp(int c, int b, float f)
+    {
+        float a = ReverseLerp(c, b, f);
+        return Mathf.FloorToInt(a);
+    }
+
+    /// <summary>
+    /// Given b, c and f, return the original value for 'a' in c = lerp(a,b,f)
+    /// NOTE: This is not the same as InverseLerp, which solves the equation for 'f'...
+    /// </summary>
+    /// <param name="c">The output of lerp(a,b,f)</param>
+    /// <param name="b">The second input from lerp(a,b,f)</param>
+    /// <param name="f">the lerp percentage</param>
+    /// <returns>The first input from lerp(a,b,f)</returns>
+    public static float ReverseLerp(float c, float b, float f)
+    {
+        if (!f.IsInsideRange(0, 1))
+        {
+            throw new System.ArgumentException("'f' must be a value between 0 and 1 (inclusive)");
+        }
+
+        if (f == 1)
+        {
+            return float.NaN;
+        }
+
+        float a = ((b * f) - c) / (f - 1);
+
+        return a;
+    }
+
+    /// <summary>
+    /// Given b, c and f, return a value for 'a' that approximates c = lerp(a,b,f)
+    /// but doesn't leave the range between 0 and 1.
+    /// </summary>
+    /// <param name="c">The output of lerp(a,b,f)</param>
+    /// <param name="b">The second input from lerp(a,b,f)</param>
+    /// <param name="f">the lerp percentage</param>
+    /// <returns>The first input from lerp(a,b,f)</returns>
+    public static float UnLerp(float c, float b, float f)
+    {
+        if (!f.IsInsideRange(0, 1))
+        {
+            throw new System.ArgumentException("'f' must be a value between 0 and 1 (inclusive)");
+        }
+
+        if (f == 1)
+        {
+            return float.NaN;
+        }
+
+        float a = ((b * f) - c) / (f - 1);
+        float ca = c - a;
+
+        if (b > c)
+        {
+            a = c * (1 - (ca / (ca + 1)));
+        }
+        else
+        {
+            ca = -ca;
+
+            a = c + (1 - c) * (ca / (ca + 1));
+        }
+
+        return a;
     }
 
     // Only for values between 0 and 1
@@ -200,45 +328,93 @@ public static class MathUtility
         return 0;
     }
 
-    // TODO: Lazy implementation. Do better...
+    /// <summary>
+    /// Scales the input so that the output equals 1 if value == max, and
+    /// equals 0 if value == min
+    /// </summary>
+    /// <param name="value">The input</param>
+    /// <param name="max">Max possible value for input</param>
+    /// <param name="min">Min possible value for input</param>
+    /// <returns>the normalized value</returns>
+    public static float Normalize(float value, float max, float min)
+    {
+        return (value - min) / (max - min);
+    }
+
+    /// <summary>
+    /// Converts value using a logaritmic scale to return a value between 0 and 1
+    /// </summary>
+    /// <param name="value">input to scale</param>
+    /// <returns>logaritmically scaled value between 0 and 1</returns>
     public static float ToPseudoLogaritmicScale01(int value)
     {
         // 1, 3, 10, 32, 100, 316, 1000, 3162, 10000, 31623, 100000, 316227
 
-        if (value >= 31623)
-            return 1f;
-
-        if (value >= 10000)
-            return 0.9f;
-
-        if (value >= 3162)
-            return 0.8f;
-
-        if (value >= 1000)
-            return 0.7f;
-
-        if (value >= 316)
-            return 0.6f;
-
         if (value >= 100)
-            return 0.5f;
+        {
+            if (value >= 3162)
+            {
+                if (value >= 10000)
+                {
+                    if (value >= 31623)
+                    {
+                        return 1f;
+                    }
 
-        if (value >= 32)
-            return 0.4f;
+                    return Mathf.Lerp(0.9f, 1f, Normalize(value, 31623f, 10000f));
+                }
 
-        if (value >= 10)
-            return 0.3f;
+                return Mathf.Lerp(0.8f, 0.9f, Normalize(value, 10000f, 3162f));
+            }
+
+            if (value >= 316)
+            {
+                if (value >= 1000)
+                {
+                    return Mathf.Lerp(0.7f, 8f, Normalize(value, 3162f, 1000f));
+                }
+
+                return Mathf.Lerp(0.6f, 0.7f, Normalize(value, 1000f, 316f));
+            }
+
+            return Mathf.Lerp(0.5f, 0.6f, Normalize(value, 316f, 100f));
+        }
 
         if (value >= 3)
-            return 0.2f;
+        {
+            if (value >= 10)
+            {
+                if (value >= 32)
+                {
+                    return Mathf.Lerp(0.4f, 0.5f, Normalize(value, 100f, 32f));
+                }
 
-        if (value >= 1)
+                return Mathf.Lerp(0.3f, 0.4f, Normalize(value, 32f, 10f));
+            }
+
+            return Mathf.Lerp(0.2f, 0.3f, Normalize(value, 10f, 3f));
+        }
+
+        if (value == 2)
+        {
+            return 0.15f;
+        }
+
+        if (value == 1)
+        {
             return 0.1f;
+        }
 
         return 0f;
     }
 
-    // TODO: Lazy implementation. Do better...
+    /// <summary>
+    /// Converts value to a value between 0 and 1 using a logaritmic scale
+    /// but first it normalizes to max
+    /// </summary>
+    /// <param name="value">input to scale</param>
+    /// <param name="max">normalization value</param>
+    /// <returns>logaritmically scaled value between 0 and 1</returns>
     public static float ToPseudoLogaritmicScale01(float value, float max)
     {
         // 1, 3, 10, 32, 100, 316, 1000, 3162, 10000, 31623, 100000, 316227
@@ -246,36 +422,59 @@ public static class MathUtility
         if (value >= max)
             return 1f;
 
-        float scaledMax = max / 31623;
+        value = 31623f * value / max;
 
-        if (value >= scaledMax * 10000)
-            return 0.9f;
+        if (value >= 100f)
+        {
+            if (value >= 3162f)
+            {
+                if (value >= 10000f)
+                {
+                    if (value >= 31623f)
+                    {
+                        return 1f;
+                    }
 
-        if (value >= scaledMax * 3162)
-            return 0.8f;
+                    return Mathf.Lerp(0.9f, 1f, Normalize(value, 31623f, 10000f));
+                }
 
-        if (value >= scaledMax * 1000)
-            return 0.7f;
+                return Mathf.Lerp(0.8f, 0.9f, Normalize(value, 10000f, 3162f));
+            }
 
-        if (value >= scaledMax * 316)
-            return 0.6f;
+            if (value >= 316f)
+            {
+                if (value >= 1000f)
+                {
+                    return Mathf.Lerp(0.7f, 8f, Normalize(value, 3162f, 1000f));
+                }
 
-        if (value >= scaledMax * 100)
-            return 0.5f;
+                return Mathf.Lerp(0.6f, 0.7f, Normalize(value, 1000f, 316f));
+            }
 
-        if (value >= scaledMax * 32)
-            return 0.4f;
+            return Mathf.Lerp(0.5f, 0.6f, Normalize(value, 316f, 100f));
+        }
 
-        if (value >= scaledMax * 10)
-            return 0.3f;
+        if (value >= 3f)
+        {
+            if (value >= 10f)
+            {
+                if (value >= 32f)
+                {
+                    return Mathf.Lerp(0.4f, 0.5f, Normalize(value, 100f, 32f));
+                }
 
-        if (value >= scaledMax * 3)
-            return 0.2f;
+                return Mathf.Lerp(0.3f, 0.4f, Normalize(value, 32f, 10f));
+            }
 
-        if (value >= scaledMax)
-            return 0.1f;
+            return Mathf.Lerp(0.2f, 0.3f, Normalize(value, 10f, 3f));
+        }
 
-        return 0f;
+        if (value >= 1f)
+        {
+            return Mathf.Lerp(0.1f, 0.2f, Normalize(value, 3f, 1f));
+        }
+
+        return Mathf.Lerp(0.0f, 0.1f, value);
     }
 
     // TODO: Lazy implementation. Do better...
@@ -304,6 +503,91 @@ public static class MathUtility
             return (T)values.GetValue(0);
         }
 
-        return default(T);
+        return default;
+    }
+
+    public static int MinWrappedDist(int a, int b, int wrapLength)
+    {
+        int dist1 = Mathf.Abs(a - b);
+        int dist2 = Mathf.Abs(a + wrapLength - b);
+
+        return Mathf.Min(dist1, dist2);
+    }
+
+    public static void Extend(this ref RectInt rect, Vector2Int pos, int mapWidth)
+    {
+        rect.yMin = Mathf.Min(rect.yMin, pos.y);
+        rect.yMax = Mathf.Max(rect.yMax, pos.y);
+
+        // we can't have a rect with a width larger than the map length
+        if (rect.width == mapWidth)
+            return;
+
+        int distLeft = 0;
+        int distRight = 0;
+
+        // this big if-block will take care of handling the case where the rect
+        // could end up wrapping around the map longitude-wise
+        if (pos.x < rect.xMin)
+        {
+            // if the wrapped around longitude falls inside the rect then
+            // ignore it
+            if ((pos.x + mapWidth) < rect.xMax)
+                return;
+
+            distLeft = rect.xMin - pos.x;
+            distRight = pos.x + mapWidth - rect.xMax;
+        }
+
+        // this big if-block will take care of handling the case where the rect
+        // could end up wrapping around the map longitude-wise on the reverse
+        // direction
+        if (pos.x > rect.xMax)
+        {
+            // if the wrapped around longitude falls inside the rect then
+            // ignore it
+            if ((pos.x - mapWidth) > rect.xMin)
+                return;
+
+            distLeft = rect.xMin + mapWidth - pos.x;
+            distRight = pos.x - rect.xMax;
+        }
+
+        // if the distance between the pos x and the rect max x is less
+        // than the distance between the pos x and the rect min x,
+        // that means we can encompass the pos with a smaller rect by
+        // increasing the rect max x instead of decreasing the rect min x
+        if (distRight < distLeft)
+        {
+            rect.xMax += distRight;
+        }
+        else
+        {
+            rect.xMin -= distLeft;
+        }
+
+        if (rect.width > mapWidth)
+        {
+            // make sure the target rect width doesn't exceed the map width
+            rect.xMax = rect.xMin + mapWidth;
+        }
+    }
+
+    public static void Extend(this ref RectInt target, RectInt source, int mapWidth)
+    {
+        target.Extend(source.min, mapWidth);
+        target.Extend(source.max, mapWidth);
+    }
+
+    public static Rect Lerp(Rect a, Rect b, float t)
+    {
+        Rect r = new Rect();
+
+        r.xMin = Mathf.Lerp(a.xMin, b.xMin, t);
+        r.xMax = Mathf.Lerp(a.xMax, b.xMax, t);
+        r.yMin = Mathf.Lerp(a.yMin, b.yMin, t);
+        r.yMax = Mathf.Lerp(a.yMax, b.yMax, t);
+
+        return r;
     }
 }

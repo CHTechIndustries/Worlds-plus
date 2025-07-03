@@ -103,16 +103,23 @@ public class BiomeLoader
             throw new ArgumentException("biome arability must be a value between 0 and 1 (inclusive)");
         }
 
+        string skillId = b.id + BiomeSurvivalSkill.SkillIdSuffix;
+        string skillName = b.name + BiomeSurvivalSkill.SkillNamePart;
+
         Biome biome = new Biome()
         {
             Id = b.id,
-            IdHash = b.id.GetHashCode(),
             Name = b.name,
+            SkillId = skillId,
+            SkillName = skillName,
+            IdHash = b.id.GetHashCode(),
             Survivability = b.survivability,
             ForagingCapacity = b.foragingCapacity,
             Accessibility = b.accessibility,
             Arability = b.arability
         };
+
+        CulturalSkill.AddValidSkillId(skillId);
 
         switch (b.type)
         {
@@ -148,7 +155,7 @@ public class BiomeLoader
 
         if (b.maxAltitude != null)
         {
-            if (!float.TryParse(b.maxAltitude, out biome.MaxAltitude))
+            if (!MathUtility.TryParseCultureInvariant(b.maxAltitude, out biome.MaxAltitude))
             {
                 throw new ArgumentException("Invalid maxAltitude value: " + b.maxAltitude);
             }
@@ -165,7 +172,7 @@ public class BiomeLoader
 
         if (b.minAltitude != null)
         {
-            if (!float.TryParse(b.minAltitude, out biome.MinAltitude))
+            if (!MathUtility.TryParseCultureInvariant(b.minAltitude, out biome.MinAltitude))
             {
                 throw new ArgumentException("Invalid minAltitude value: " + b.minAltitude);
             }
@@ -182,7 +189,7 @@ public class BiomeLoader
 
         if (b.altitudeSaturationSlope != null)
         {
-            if (!float.TryParse(b.altitudeSaturationSlope, out biome.AltSaturationSlope))
+            if (!MathUtility.TryParseCultureInvariant(b.altitudeSaturationSlope, out biome.AltSaturationSlope))
             {
                 throw new ArgumentException("Invalid altitudeSaturationSlope value: " + b.altitudeSaturationSlope);
             }
@@ -199,7 +206,7 @@ public class BiomeLoader
 
         if (b.maxRainfall != null)
         {
-            if (!float.TryParse(b.maxRainfall, out biome.MaxRainfall))
+            if (!MathUtility.TryParseCultureInvariant(b.maxRainfall, out biome.MaxRainfall))
             {
                 throw new ArgumentException("Invalid maxRainfall value: " + b.maxRainfall);
             }
@@ -216,7 +223,7 @@ public class BiomeLoader
 
         if (b.minRainfall != null)
         {
-            if (!float.TryParse(b.minRainfall, out biome.MinRainfall))
+            if (!MathUtility.TryParseCultureInvariant(b.minRainfall, out biome.MinRainfall))
             {
                 throw new ArgumentException("Invalid minRainfall value: " + b.minRainfall);
             }
@@ -233,7 +240,7 @@ public class BiomeLoader
 
         if (b.maxFlowingWater != null)
         {
-            if (!float.TryParse(b.maxFlowingWater, out biome.MaxFlowingWater))
+            if (!MathUtility.TryParseCultureInvariant(b.maxFlowingWater, out biome.MaxFlowingWater))
             {
                 throw new ArgumentException("Invalid minFlowingWater value: " + b.maxFlowingWater);
             }
@@ -250,7 +257,7 @@ public class BiomeLoader
 
         if (b.minFlowingWater != null)
         {
-            if (!float.TryParse(b.minFlowingWater, out biome.MinFlowingWater))
+            if (!MathUtility.TryParseCultureInvariant(b.minFlowingWater, out biome.MinFlowingWater))
             {
                 throw new ArgumentException("Invalid minFlowingWater value: " + b.minFlowingWater);
             }
@@ -267,7 +274,7 @@ public class BiomeLoader
 
         if (b.waterSaturationSlope != null)
         {
-            if (!float.TryParse(b.waterSaturationSlope, out biome.WaterSaturationSlope))
+            if (!MathUtility.TryParseCultureInvariant(b.waterSaturationSlope, out biome.WaterSaturationSlope))
             {
                 throw new ArgumentException("Invalid waterSaturationSlope value: " + b.waterSaturationSlope);
             }
@@ -284,7 +291,7 @@ public class BiomeLoader
 
         if (b.maxTemperature != null)
         {
-            if (!float.TryParse(b.maxTemperature, out biome.MaxTemperature))
+            if (!MathUtility.TryParseCultureInvariant(b.maxTemperature, out biome.MaxTemperature))
             {
                 throw new ArgumentException("Invalid maxTemperature value: " + b.maxTemperature);
             }
@@ -301,7 +308,7 @@ public class BiomeLoader
 
         if (b.minTemperature != null)
         {
-            if (!float.TryParse(b.minTemperature, out biome.MinTemperature))
+            if (!MathUtility.TryParseCultureInvariant(b.minTemperature, out biome.MinTemperature))
             {
                 throw new ArgumentException("Invalid minTemperature value: " + b.minTemperature);
             }
@@ -318,7 +325,7 @@ public class BiomeLoader
 
         if (b.temperatureSaturationSlope != null)
         {
-            if (!float.TryParse(b.temperatureSaturationSlope, out biome.TempSaturationSlope))
+            if (!MathUtility.TryParseCultureInvariant(b.temperatureSaturationSlope, out biome.TempSaturationSlope))
             {
                 throw new ArgumentException("Invalid temperatureSaturationSlope value: " + b.temperatureSaturationSlope);
             }
@@ -362,7 +369,7 @@ public class BiomeLoader
 
         if (c.maxValue != null)
         {
-            if (!float.TryParse(c.maxValue, out constraint.MaxValue))
+            if (!MathUtility.TryParseCultureInvariant(c.maxValue, out constraint.MaxValue))
             {
                 throw new ArgumentException("Invalid constraint maxValue value: " + c.maxValue);
             }
@@ -379,7 +386,7 @@ public class BiomeLoader
 
         if (c.minValue != null)
         {
-            if (!float.TryParse(c.minValue, out constraint.MinValue))
+            if (!MathUtility.TryParseCultureInvariant(c.minValue, out constraint.MinValue))
             {
                 throw new ArgumentException("Invalid constraint minValue value: " + c.minValue);
             }
@@ -408,7 +415,7 @@ public class BiomeLoader
 
         if (c.saturationSlope != null)
         {
-            if (!float.TryParse(c.saturationSlope, out constraint.SaturationSlope))
+            if (!MathUtility.TryParseCultureInvariant(c.saturationSlope, out constraint.SaturationSlope))
             {
                 throw new ArgumentException("Invalid constraint saturationSlope value: " + c.saturationSlope);
             }

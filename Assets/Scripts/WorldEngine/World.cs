@@ -8,130 +8,6 @@ using UnityEngine.Profiling;
 
 public delegate void ProgressCastDelegate(float value, string message = null, bool reset = false);
 
-public interface ISynchronizable
-{
-    void Synchronize();
-    void FinalizeLoad();
-}
-
-public static class RngOffsets
-{
-    //public const int CELL_GROUP_CONSIDER_LAND_MIGRATION_TARGET = 0;
-    public const int CELL_GROUP_CONSIDER_LAND_MIGRATION_CHANCE = 1;
-
-    public const int CELL_GROUP_CONSIDER_SEA_MIGRATION = 2;
-
-    public const int CELL_GROUP_CALCULATE_NEXT_UPDATE = 3;
-
-    public const int CELL_GROUP_SET_POLITY_UPDATE = 4;
-
-    public const int CELL_GROUP_CONSIDER_POLITY_PROMINENCE_EXPANSION_POLITY = 5;
-    public const int CELL_GROUP_CONSIDER_POLITY_PROMINENCE_EXPANSION_TARGET = 6;
-    public const int CELL_GROUP_CONSIDER_POLITY_PROMINENCE_EXPANSION_CHANCE = 7;
-
-    public const int CELL_GROUP_UPDATE_MIGRATION_DIRECTION = 8;
-    public const int CELL_GROUP_GENERATE_GROUP_MIGRATION_DIRECTION = 9;
-    public const int CELL_GROUP_GENERATE_PROMINENCE_TRANSFER_DIRECTION = 10;
-    public const int CELL_GROUP_GENERATE_CORE_MIGRATION_DIRECTION = 11;
-
-    public const int PREFERENCE_UPDATE = 10000;
-    public const int PREFERENCE_POLITY_PROMINENCE = 10100;
-
-    public const int ACTIVITY_UPDATE = 11000;
-    public const int ACTIVITY_POLITY_PROMINENCE = 11100;
-
-    public const int KNOWLEDGE_MERGE = 20000;
-    public const int KNOWLEDGE_MODIFY_VALUE = 20100;
-    public const int KNOWLEDGE_UPDATE_VALUE_INTERNAL = 20200;
-    public const int KNOWLEDGE_POLITY_PROMINENCE = 20300;
-    public const int KNOWLEDGE_FACTION_CORE_UPDATE = 20400;
-
-    public const int SKILL_UPDATE = 30000;
-    public const int SKILL_POLITY_PROMINENCE = 30100;
-
-    public const int POLITY_CULTURE_NORMALIZE_ATTRIBUTE_VALUES = 40000;
-    public const int POLITY_CULTURE_GENERATE_NEW_LANGUAGE = 40100;
-
-    public const int POLITY_UPDATE_EFFECTS = 50000;
-
-    public const int REGION_GENERATE_NAME = 60000;
-    public const int REGION_SELECT_BORDER_REGION_TO_REPLACE_WITH = 61000;
-
-    public const int TRIBE_GENERATE_NEW_TRIBE = 70000;
-    public const int TRIBE_GENERATE_NAME = 71000;
-
-    public const int FACTION_CULTURE_DISCOVERY_LOSS_CHANCE = 80500;
-
-    public const int CLAN_GENERATE_NAME = 85000;
-    public const int CLAN_CHOOSE_CORE_GROUP = 85100;
-    public const int CLAN_CHOOSE_TARGET_GROUP = 85200;
-    public const int CLAN_LEADER_GEN_OFFSET = 85300;
-    public const int CLAN_SPLIT = 85500;
-
-    public const int AGENT_GENERATE_BIO = 90000;
-    public const int AGENT_GENERATE_NAME = 91000;
-
-    public const int ROUTE_CHOOSE_NEXT_DEPTH_SEA_CELL = 100000;
-    public const int ROUTE_CHOOSE_NEXT_COASTAL_CELL = 110000;
-    public const int ROUTE_CHOOSE_NEXT_COASTAL_CELL_2 = 120000;
-
-    public const int FARM_DEGRADATION_EVENT_CALCULATE_TRIGGER_DATE = 900000;
-    public const int SAILING_DISCOVERY_EVENT_CALCULATE_TRIGGER_DATE = 900001;
-    public const int TRIBALISM_DISCOVERY_EVENT_CALCULATE_TRIGGER_DATE = 900002;
-    public const int TRIBE_FORMATION_EVENT_CALCULATE_TRIGGER_DATE = 900003;
-    public const int BOAT_MAKING_DISCOVERY_EVENT_CALCULATE_TRIGGER_DATE = 900004;
-    public const int PLANT_CULTIVATION_DISCOVERY_EVENT_CALCULATE_TRIGGER_DATE = 900005;
-
-    public const int CLAN_SPLITTING_EVENT_CALCULATE_TRIGGER_DATE = 900006;
-    public const int CLAN_SPLITTING_EVENT_PREFER_SPLIT = 900007;
-    public const int CLAN_SPLITTING_EVENT_LEADER_PREVENTS_MODIFY_ATTRIBUTE = 900008;
-
-    public const int TRIBE_SPLITTING_EVENT_CALCULATE_TRIGGER_DATE = 900010;
-    public const int TRIBE_SPLITTING_EVENT_SPLITCLAN_PREFER_SPLIT = 900011;
-    public const int TRIBE_SPLITTING_EVENT_TRIBE_PREFER_SPLIT = 900012;
-    public const int TRIBE_SPLITTING_EVENT_SPLITCLAN_LEADER_PREVENTS_MODIFY_ATTRIBUTE = 900013;
-    public const int TRIBE_SPLITTING_EVENT_TRIBE_LEADER_PREVENTS_MODIFY_ATTRIBUTE = 900014;
-
-    public const int CLAN_CORE_MIGRATION_EVENT_CALCULATE_TRIGGER_DATE = 900020;
-
-    public const int CLAN_DEMANDS_INFLUENCE_EVENT_CALCULATE_TRIGGER_DATE = 900021;
-    public const int CLAN_DEMANDS_INFLUENCE_EVENT_PERFORM_DEMAND = 900022;
-    public const int CLAN_DEMANDS_INFLUENCE_EVENT_ACCEPT_DEMAND = 900023;
-    public const int CLAN_DEMANDS_INFLUENCE_EVENT_DEMANDCLAN_LEADER_AVOIDS_DEMAND_MODIFY_ATTRIBUTE = 900024;
-    public const int CLAN_DEMANDS_INFLUENCE_EVENT_DEMANDCLAN_LEADER_DEMANDS_MODIFY_ATTRIBUTE = 900025;
-    public const int CLAN_DEMANDS_INFLUENCE_EVENT_DOMINANTCLAN_LEADER_REJECTS_DEMAND_MODIFY_ATTRIBUTE = 900026;
-    public const int CLAN_DEMANDS_INFLUENCE_EVENT_DOMINANTCLAN_LEADER_ACCEPTS_DEMAND_MODIFY_ATTRIBUTE = 900027;
-
-    public const int FOSTER_TRIBE_RELATION_EVENT_CALCULATE_TRIGGER_DATE = 900030;
-    public const int FOSTER_TRIBE_RELATION_EVENT_MAKE_ATTEMPT = 900031;
-    public const int FOSTER_TRIBE_RELATION_EVENT_REJECT_OFFER = 900032;
-    public const int FOSTER_TRIBE_RELATION_EVENT_SOURCETRIBE_LEADER_AVOIDS_ATTEMPT_MODIFY_ATTRIBUTE = 900033;
-    public const int FOSTER_TRIBE_RELATION_EVENT_SOURCETRIBE_LEADER_MAKES_ATTEMPT_MODIFY_ATTRIBUTE = 900034;
-    public const int FOSTER_TRIBE_RELATION_EVENT_TARGETTRIBE_LEADER_ACCEPT_OFFER = 900035;
-    public const int FOSTER_TRIBE_RELATION_EVENT_TARGETTRIBE_LEADER_REJECTS_OFFER_MODIFY_ATTRIBUTE = 900036;
-    public const int FOSTER_TRIBE_RELATION_EVENT_TARGETTRIBE_LEADER_ACCEPTS_OFFER_MODIFY_ATTRIBUTE = 900037;
-
-    public const int MERGE_TRIBES_EVENT_CALCULATE_TRIGGER_DATE = 900040;
-    public const int MERGE_TRIBES_EVENT_MAKE_ATTEMPT = 900041;
-    public const int MERGE_TRIBES_EVENT_REJECT_OFFER = 900042;
-    public const int MERGE_TRIBES_EVENT_SOURCETRIBE_LEADER_AVOIDS_ATTEMPT_MODIFY_ATTRIBUTE = 900043;
-    public const int MERGE_TRIBES_EVENT_SOURCETRIBE_LEADER_MAKES_ATTEMPT_MODIFY_ATTRIBUTE = 900044;
-    public const int MERGE_TRIBES_EVENT_TARGETTRIBE_LEADER_ACCEPT_OFFER = 900045;
-    public const int MERGE_TRIBES_EVENT_TARGETTRIBE_LEADER_REJECTS_OFFER_MODIFY_ATTRIBUTE = 900046;
-    public const int MERGE_TRIBES_EVENT_TARGETTRIBE_LEADER_ACCEPTS_OFFER_MODIFY_ATTRIBUTE = 900047;
-
-    public const int OPEN_TRIBE_EVENT_CALCULATE_TRIGGER_DATE = 900050;
-    public const int OPEN_TRIBE_EVENT_MAKE_ATTEMPT = 900051;
-    public const int OPEN_TRIBE_EVENT_SOURCETRIBE_LEADER_AVOIDS_ATTEMPT_MODIFY_ATTRIBUTE = 900052;
-    public const int OPEN_TRIBE_EVENT_SOURCETRIBE_LEADER_MAKES_ATTEMPT_MODIFY_ATTRIBUTE = 900053;
-
-    public const int EVENT_TRIGGER = 1000000;
-    public const int EVENT_CAN_TRIGGER = 1100000;
-
-    public const int MIGRATING_GROUP_MOVE_FACTION_CORE = 2000000;
-    public const int EXPAND_POLITY_MOVE_FACTION_CORE = 2100000;
-}
-
 public enum GenerationType
 {
     Temperature = 0x03, // also generate rainfall
@@ -140,13 +16,15 @@ public enum GenerationType
     TerrainRegeneration = 0x0B, // regenerate altitude, generate temperature and rainfall
     TemperatureRegeneration = 0x12, // also generate rainfall
     RainfallRegeneration = 0x20,
-    LayerRegeneration = 0x40
+    LayerRegeneration = 0x40,
+    DrainageGeneration = 0x00
 }
 
 [XmlRoot]
-public class World : ISynchronizable
+public class World : ISynchronizable, IWorldDateGetter
 {
-    public const long MaxSupportedDate = 9223372036L;
+    //public const long MaxSupportedDate = 9223372036L;
+    public const long MaxSupportedDate = long.MaxValue;
 
     public const int YearLength = 365;
 
@@ -174,16 +52,13 @@ public class World : ISynchronizable
 
     public const float MinPossibleTemperature = -50 - AvgPossibleTemperature;
     public const float MaxPossibleTemperature = 30 + AvgPossibleTemperature;
-    
+
     public const float OceanDispersalFactor = 0.25f;
     public const float MinOceanDispersal = 50f;
     public const float WaterErosionFactor = 600f;
-    public const float OverflowFactor = 1f;
     public const float HeightToRainfallConversionFactor = 1000f;
     public const float RainfallToHeightConversionFactor = 1f / HeightToRainfallConversionFactor;
     public const float MinRiverFlow = HeightToRainfallConversionFactor / 50f;
-
-    public const float TemperatureHoldOffFactor = 0.35f;
 
     public const float StartPopulationDensity = 0.5f;
 
@@ -195,6 +70,16 @@ public class World : ISynchronizable
     public const float TerrainGenerationSteps = 9;
 
     public static Dictionary<string, IWorldEventGenerator> EventGenerators;
+    public static Dictionary<string, PreferenceGenerator> PreferenceGenerators;
+
+    public int EventsTriggered = 0;
+    public int EventsEvaluated = 0;
+
+    public class EventEvalStats
+    {
+        public int EvaluationCount = 0;
+        public int TriggerCount = 0;
+    }
 
     [XmlAttribute]
     public int Width { get; set; }
@@ -256,17 +141,11 @@ public class World : ISynchronizable
     // Start wonky segment (save failures might happen here)
 
     [XmlArrayItem(Type = typeof(UpdateCellGroupEvent)),
-        XmlArrayItem(Type = typeof(MigrateGroupEvent)),
-        XmlArrayItem(Type = typeof(ExpandPolityProminenceEvent)),
+        XmlArrayItem(Type = typeof(MigratePopulationEvent)),
         XmlArrayItem(Type = typeof(TribeFormationEvent)),
-        XmlArrayItem(Type = typeof(ClanSplitDecisionEvent)),
-        XmlArrayItem(Type = typeof(TribeSplitDecisionEvent)),
-        XmlArrayItem(Type = typeof(ClanDemandsInfluenceDecisionEvent)),
-        XmlArrayItem(Type = typeof(ClanCoreMigrationEvent)),
-        XmlArrayItem(Type = typeof(FosterTribeRelationDecisionEvent)),
-        XmlArrayItem(Type = typeof(MergeTribesDecisionEvent)),
-        XmlArrayItem(Type = typeof(OpenTribeDecisionEvent)),
-        XmlArrayItem(Type = typeof(Discovery.Event))]
+        XmlArrayItem(Type = typeof(Discovery033.DiscoveryEvent033)),
+        XmlArrayItem(Type = typeof(FactionModEvent)),
+        XmlArrayItem(Type = typeof(CellGroupModEvent))]
     public List<WorldEvent> EventsToHappen;
 
     public List<TerrainCellAlteration> TerrainCellAlterationList = new List<TerrainCellAlteration>();
@@ -277,7 +156,7 @@ public class World : ISynchronizable
     public List<CulturalKnowledgeInfo> CulturalKnowledgeInfoList = new List<CulturalKnowledgeInfo>();
 
     public List<string> ExistingDiscoveryIds = new List<string>();
-    
+
     public List<CellGroup> CellGroups;
 
     [XmlArrayItem(Type = typeof(Agent))]
@@ -289,9 +168,13 @@ public class World : ISynchronizable
 
     public List<Language> Languages = null;
 
-    // End wonky segment 
+    // End wonky segment
 
     public List<long> EventMessageIds;
+
+    [XmlIgnore]
+    public Dictionary<string, EventEvalStats> EventEvalStatsPerType =
+        new Dictionary<string, EventEvalStats>();
 
     [XmlIgnore]
     public int EventsToHappenCount { get; private set; }
@@ -302,8 +185,19 @@ public class World : ISynchronizable
     public Region SelectedRegion = null;
     [XmlIgnore]
     public Territory SelectedTerritory = null;
+
+    [XmlIgnore]
+    public TerrainCell HoveredCell = null;
+    [XmlIgnore]
+    public Region HoveredRegion = null;
+    [XmlIgnore]
+    public Territory HoveredTerritory = null;
+    [XmlIgnore]
+    public Faction HoveredFaction = null;
+
     [XmlIgnore]
     public Faction GuidedFaction = null;
+
     [XmlIgnore]
     public HashSet<Polity> PolitiesUnderPlayerFocus = new HashSet<Polity>();
 
@@ -350,7 +244,7 @@ public class World : ISynchronizable
     public ProgressCastDelegate ProgressCastMethod { get; set; }
 
     [XmlIgnore]
-    public HumanGroup MigrationTaggedGroup = null;
+    public CellGroup MigrationTaggedGroup = null;
 
     [XmlIgnore]
     public bool GroupsHaveBeenUpdated = false;
@@ -358,8 +252,29 @@ public class World : ISynchronizable
     public bool FactionsHaveBeenUpdated = false;
     [XmlIgnore]
     public bool PolitiesHaveBeenUpdated = false;
+
+#if DEBUG
+    private bool _needsDrainageRegeneration = true;
+
     [XmlIgnore]
-    public bool PolityClustersHaveBeenUpdated = false;
+    public bool NeedsDrainageRegeneration
+    {
+        get {
+            return _needsDrainageRegeneration;
+        }
+        set {
+            if (value == true)
+            {
+                Debug.Log("NeedsDrainageRegeneration set to true");
+            }
+
+            _needsDrainageRegeneration = value;
+        }
+    }
+#else
+    [XmlIgnore]
+    public bool NeedsDrainageRegeneration = true;
+#endif
 
 #if DEBUG
     [XmlIgnore]
@@ -367,11 +282,14 @@ public class World : ISynchronizable
 #endif
 
     [XmlIgnore]
-    public Dictionary<string, Discovery> ExistingDiscoveries = new Dictionary<string, Discovery>();
+    public Dictionary<string, IDiscovery> ExistingDiscoveries = new Dictionary<string, IDiscovery>();
 
-    private Dictionary<long, FactionInfo> _factionInfos = new Dictionary<long, FactionInfo>();
-    private Dictionary<long, PolityInfo> _polityInfos = new Dictionary<long, PolityInfo>();
-    private Dictionary<long, RegionInfo> _regionInfos = new Dictionary<long, RegionInfo>();
+    private Dictionary<Identifier, FactionInfo> _factionInfos =
+        new Dictionary<Identifier, FactionInfo>();
+    private Dictionary<Identifier, PolityInfo> _polityInfos =
+        new Dictionary<Identifier, PolityInfo>();
+    private Dictionary<Identifier, RegionInfo> _regionInfos =
+        new Dictionary<Identifier, RegionInfo>();
 
     private BinaryTree<long, WorldEvent> _eventsToHappen = new BinaryTree<long, WorldEvent>();
 
@@ -382,33 +300,55 @@ public class World : ISynchronizable
     private HashSet<string> _culturalSkillIdList = new HashSet<string>();
     private HashSet<string> _culturalKnowledgeIdList = new HashSet<string>();
 
-    private Dictionary<long, CellGroup> _cellGroups = new Dictionary<long, CellGroup>();
+    private Dictionary<Identifier, CellGroup> _cellGroups =
+        new Dictionary<Identifier, CellGroup>();
 
     private HashSet<CellGroup> _updatedGroups = new HashSet<CellGroup>();
     private HashSet<CellGroup> _groupsToUpdate = new HashSet<CellGroup>();
+    private HashSet<CellGroup> _groupsToApplyEventsTo = new HashSet<CellGroup>();
     private HashSet<CellGroup> _groupsToRemove = new HashSet<CellGroup>();
+    private HashSet<CellGroup> _groupsWithPolityCountChange = new HashSet<CellGroup>();
+    private HashSet<CellGroup> _groupsWithCoreCountChange = new HashSet<CellGroup>();
+
+    private HashSet<PolityProminence> _promsWithCoreDistToCalculate = new HashSet<PolityProminence>();
+    private HashSet<PolityProminence> _promsWithCoreDistToDefault = new HashSet<PolityProminence>();
 
     private HashSet<CellGroup> _groupsToPostUpdate_afterPolityUpdates = new HashSet<CellGroup>();
     private HashSet<CellGroup> _groupsToCleanupAfterUpdate = new HashSet<CellGroup>();
 
-    private List<MigratingGroup> _migratingGroups = new List<MigratingGroup>();
+    private List<MigratingPopulation> _migratingPopulations = new List<MigratingPopulation>();
 
-    private Dictionary<long, Agent> _memorableAgents = new Dictionary<long, Agent>();
+    private Dictionary<Identifier, Agent> _memorableAgents =
+        new Dictionary<Identifier, Agent>();
 
-    private HashSet<Faction> _factionsToSplit = new HashSet<Faction>();
     private HashSet<Faction> _factionsToUpdate = new HashSet<Faction>();
+    private HashSet<Faction> _factionsWithStatusChanges = new HashSet<Faction>();
+    private HashSet<Faction> _factionsToAssignEventsTo = new HashSet<Faction>();
+    private HashSet<Faction> _factionsToCleanup = new HashSet<Faction>();
     private HashSet<Faction> _factionsToRemove = new HashSet<Faction>();
 
     private HashSet<Polity> _politiesToUpdate = new HashSet<Polity>();
-    private HashSet<Polity> _politiesThatNeedClusterUpdate = new HashSet<Polity>();
     private HashSet<Polity> _politiesToRemove = new HashSet<Polity>();
 
-    private Dictionary<long, Language> _languages = new Dictionary<long, Language>();
+    private HashSet<Territory> _territoriesToUpdate = new HashSet<Territory>();
+
+    private Dictionary<Identifier, Language> _languages =
+        new Dictionary<Identifier, Language>();
 
     private HashSet<long> _eventMessageIds = new HashSet<long>();
-    private Queue<WorldEventMessage> _eventMessagesToShow = new Queue<WorldEventMessage>();
+    private Queue<WorldEventMessage> _eventMessagesToShow =
+        new Queue<WorldEventMessage>();
 
-    private Queue<Decision> _decisionsToResolve = new Queue<Decision>();
+    private readonly Queue<ModDecisionData> _highPrioDecisionsToResolve =
+        new Queue<ModDecisionData>();
+
+    private readonly Queue<ModDecisionData> _lowPrioDecisionsToResolve =
+        new Queue<ModDecisionData>();
+
+    private ModAction _actionToExecute = null;
+
+    private readonly Queue<IEffectExpression> _effectsToResolve =
+        new Queue<IEffectExpression>();
 
     private Vector2[] _continentOffsets;
     private float[] _continentWidths;
@@ -421,7 +361,7 @@ public class World : ISynchronizable
 
     private float _cellMaxSideLength;
 
-    private long _dateToSkipTo;
+    private long _dateToSkipTo = long.MaxValue;
 
     private bool _justLoaded = false;
 
@@ -451,15 +391,22 @@ public class World : ISynchronizable
     private ManagerTask<Vector3> _rainfallNoiseOffset2;
     private ManagerTask<Vector3> _rainfallNoiseOffset3;
 
-    private Dictionary<string, ManagerTask<Vector3>[]> _layerNoiseOffsets = new Dictionary<string, ManagerTask<Vector3>[]>();
+    private Dictionary<string, ManagerTask<Vector3>[]> _layerNoiseOffsets =
+        new Dictionary<string, ManagerTask<Vector3>[]>();
 
-    private static HashSet<TerrainCell> _cellsToRegen = new HashSet<TerrainCell>();
-    private static HashSet<TerrainCell> _cellsToInit = new HashSet<TerrainCell>();
-    private static HashSet<TerrainCell> _cellsToInitAfterDrainageRegen = new HashSet<TerrainCell>();
+    private static HashSet<TerrainCell> _cellsToRegen =
+        new HashSet<TerrainCell>();
+    private static HashSet<TerrainCell> _cellsToInit =
+        new HashSet<TerrainCell>();
+    private static HashSet<TerrainCell> _cellsToInitAfterDrainageRegen =
+        new HashSet<TerrainCell>();
 
-    private static HashSet<TerrainCell> _cellsToDrainage = new HashSet<TerrainCell>();
-    private static BinaryHeap<TerrainCell> _drainageHeap = new BinaryHeap<TerrainCell>(TerrainCell.CompareOriginalAltitude);
-    private static HashSet<TerrainCell> _cellsToFinalizeDrainageRegen = new HashSet<TerrainCell>();
+    private static HashSet<TerrainCell> _cellsToDrain =
+        new HashSet<TerrainCell>();
+    private static BinaryHeap<TerrainCell> _drainageEvalHeap =
+        new BinaryHeap<TerrainCell>(TerrainCell.CompareOriginalAltitude);
+    private static HashSet<TerrainCell> _cellsToFinalizeDrainageRegen =
+        new HashSet<TerrainCell>();
 
     //private OpenSimplexNoise _openSimplexNoise;
 
@@ -478,7 +425,12 @@ public class World : ISynchronizable
         Height = height;
         Seed = seed;
 
+#if DEBUG
+        CurrentDate = 0; // To set custom date for debugging
+#else
         CurrentDate = 0;
+#endif
+
         MaxTimeToSkip = MaxPossibleTimeToSkip;
         EventsToHappenCount = 0;
         CellGroupCount = 0;
@@ -487,9 +439,11 @@ public class World : ISynchronizable
         TerrainCellAlterationListCount = 0;
     }
 
-    private void InitializeTerrainLimitsAndSettings()
+    /// <summary>Initializes the parameters to be used when generating a new world.</summary>
+    /// <param name="justLoaded">Indicate if the world being generated is based on a loaded save file.</param>
+    private void InitializeTerrainLimitsAndSettings(bool justLoaded)
     {
-        _justLoaded = false;
+        _justLoaded = justLoaded;
 
         foreach (LayerSettings settings in LayerSettings)
         {
@@ -515,9 +469,9 @@ public class World : ISynchronizable
 
     public void StartReinitialization(float accumulatedProgress, float maxExpectedProgress)
     {
-        InitializeTerrainLimitsAndSettings();
+        InitializeTerrainLimitsAndSettings(false);
 
-           _accumulatedProgress = accumulatedProgress;
+        _accumulatedProgress = accumulatedProgress;
         _progressIncrement = (maxExpectedProgress - _accumulatedProgress) / TerrainGenerationSteps;
 
         Manager.EnqueueTaskAndWait(() =>
@@ -527,12 +481,11 @@ public class World : ISynchronizable
         });
     }
 
-    public void StartInitialization(float accumulatedProgress, float maxExpectedProgress, bool justLoaded = false)
+    /// <summary>
+    /// Initialize the world's terrain cells and other general parameters
+    /// </summary>
+    public void TerrainInitialization()
     {
-        //_openSimplexNoise = new OpenSimplexNoise(Seed);
-
-        InitializeTerrainLimitsAndSettings();
-
         MaxAltitude = float.MinValue;
         MinAltitude = float.MaxValue;
 
@@ -541,9 +494,6 @@ public class World : ISynchronizable
 
         MaxTemperature = float.MinValue;
         MinTemperature = float.MaxValue;
-
-        _accumulatedProgress = accumulatedProgress;
-        _progressIncrement = (maxExpectedProgress - _accumulatedProgress) / TerrainGenerationSteps;
 
         _cellMaxSideLength = Circumference / Width;
         TerrainCell.MaxArea = _cellMaxSideLength * _cellMaxSideLength;
@@ -585,6 +535,25 @@ public class World : ISynchronizable
         _continentHeights = new float[NumContinents];
         _continentWidths = new float[NumContinents];
         _continentAltitudeOffsets = new float[NumContinents];
+    }
+
+    /// <summary>
+    /// Performs the general initialization steps of a generated or loaded world
+    /// </summary>
+    /// <param name="accumulatedProgress">
+    /// How much progress has the world generation/load has already been carried out</param>
+    /// <param name="maxExpectedProgress">How much progress is expected to be completed by this process</param>
+    /// <param name="justLoaded">Has the world just been loaded from a save file?</param>
+    public void StartInitialization(float accumulatedProgress, float maxExpectedProgress, bool justLoaded = false)
+    {
+        //_openSimplexNoise = new OpenSimplexNoise(Seed);
+
+        InitializeTerrainLimitsAndSettings(justLoaded);
+
+        _accumulatedProgress = accumulatedProgress;
+        _progressIncrement = (maxExpectedProgress - _accumulatedProgress) / TerrainGenerationSteps;
+
+        TerrainInitialization();
 
         // When it's a loaded world there might be already terrain modifications that we need to set
         foreach (TerrainCellAlteration changes in TerrainCellAlterationList)
@@ -615,13 +584,29 @@ public class World : ISynchronizable
     public static void ResetStaticModData()
     {
         EventGenerators = new Dictionary<string, IWorldEventGenerator>();
+        PreferenceGenerators = new Dictionary<string, PreferenceGenerator>();
     }
 
     public static IWorldEventGenerator GetEventGenerator(string id)
     {
-        IWorldEventGenerator generator;
+        if (!EventGenerators.TryGetValue(id, out IWorldEventGenerator generator))
+        {
+            return null;
+        }
 
-        if (!EventGenerators.TryGetValue(id, out generator))
+        return generator;
+    }
+
+    /// <summary>
+    /// Returns the generator for the preference with the specified id.
+    /// Generators are created through mods. So if the mod is not loaded,
+    /// this function will return null
+    /// </summary>
+    /// <param name="id">the id of the generator to obtain</param>
+    /// <returns>the preference generator</returns>
+    public static PreferenceGenerator GetPreferenceGenerator(string id)
+    {
+        if (!PreferenceGenerators.TryGetValue(id, out PreferenceGenerator generator))
         {
             return null;
         }
@@ -662,11 +647,11 @@ public class World : ISynchronizable
         }
 
 #if DEBUG
-        string debugMsg = "Total Groups: " + _cellGroups.Count + "\nSerialized event types:";
+        string debugMsg = $"Total Groups: {_cellGroups.Count}\nSerialized event types:";
 
         foreach (KeyValuePair<System.Type, int> pair in eventTypes)
         {
-            debugMsg += "\n\t" + pair.Key + " : " + pair.Value;
+            debugMsg += $"\n\t{pair.Key} : {pair.Value}";
         }
 
         Debug.Log(debugMsg);
@@ -777,7 +762,7 @@ public class World : ISynchronizable
 
         Manager.ResetSlantsAround(cell);
 
-        foreach (TerrainCell nCell in cell.Neighbors.Values)
+        foreach (TerrainCell nCell in cell.NeighborList)
         {
             Manager.AddUpdatedCell(nCell, CellUpdateType.Cell, CellUpdateSubType.Terrain);
         }
@@ -840,7 +825,7 @@ public class World : ISynchronizable
         _culturalKnowledgeIdList.Add(baseInfo.Id);
     }
 
-    public void AddExistingDiscovery(Discovery discovery)
+    public void AddExistingDiscovery(IDiscovery discovery)
     {
         if (ExistingDiscoveries.ContainsKey(discovery.Id))
             return;
@@ -914,18 +899,17 @@ public class World : ISynchronizable
     {
         MaxTimeToSkip = (value > 1) ? value : 1;
 
-        long maxDate = CurrentDate + MaxTimeToSkip;
+        long maxDate = CurrentDate + (Manager.SimulationPerformingStep? 1 : MaxTimeToSkip);
 
-#if DEBUG
         if (maxDate >= MaxSupportedDate)
         {
-            Debug.LogWarning("'maxDate' shouldn't be greater than " + World.MaxSupportedDate + " (date = " + maxDate + ")");
+            Debug.LogWarning(
+                "World.SetMaxTimeToSkip - 'maxDate' is greater than " +
+                MaxSupportedDate + " (date = " + maxDate + ")");
         }
-#endif
 
         if (maxDate < 0)
         {
-            Debug.Break();
             throw new System.Exception("Surpassed date limit (Int64.MaxValue)");
         }
 
@@ -1018,26 +1002,93 @@ public class World : ISynchronizable
         _groupsToUpdate.Clear();
     }
 
-    private void MigrateGroups()
+    private void CalculateProminenceDistancesToCores()
     {
-        foreach (MigratingGroup group in _migratingGroups)
+        var promsToCalculate = new Queue<PolityProminence>();
+        var promsToCalculateSet = new HashSet<PolityProminence>();
+
+        foreach (var polityProminence in _promsWithCoreDistToCalculate)
         {
-            group.SplitFromSourceGroup();
+            if (!polityProminence.StillPresent)
+            {
+                continue;
+            }
+
+            promsToCalculate.Enqueue(polityProminence);
+            promsToCalculateSet.Add(polityProminence);
         }
 
-        foreach (MigratingGroup group in _migratingGroups)
+        while (promsToCalculate.Count > 0)
         {
-            group.MoveToCell();
+            PolityProminence polityProminence = promsToCalculate.Dequeue();
+            promsToCalculateSet.Remove(polityProminence);
+
+            if (!polityProminence.CalculateNewCoreDistances())
+                continue;
+
+            float currentFactionCoreDist = polityProminence.FactionCoreDistance;
+            float currentPolityCoreDist = polityProminence.PolityCoreDistance;
+
+            foreach (var pair in polityProminence.NeighborProminencesInPolity)
+            {
+                if (promsToCalculateSet.Contains(pair.Value))
+                    continue;
+
+                if ((pair.Value.FactionCoreDistance <= currentFactionCoreDist) &&
+                    (pair.Value.PolityCoreDistance <= currentPolityCoreDist))
+                    continue;
+
+                promsToCalculate.Enqueue(pair.Value);
+                promsToCalculateSet.Add(pair.Value);
+            }
         }
 
-        _migratingGroups.Clear();
+        foreach (var polityProminence in _promsWithCoreDistToDefault)
+        {
+            if (!polityProminence.StillPresent)
+            {
+                continue;
+            }
+
+            polityProminence.SetDefaultClosestFaction();
+        }
+
+        _promsWithCoreDistToCalculate.Clear();
+        _promsWithCoreDistToDefault.Clear();
+    }
+
+    /// <summary>
+    /// Performs the migration actions over all populations migrating during this iteration
+    /// </summary>
+    private void MigratePopulations()
+    {
+        foreach (MigratingPopulation population in _migratingPopulations)
+        {
+            population.SplitFromSourceGroup();
+        }
+
+        foreach (MigratingPopulation population in _migratingPopulations)
+        {
+            population.MoveToCell();
+        }
+
+        _migratingPopulations.Clear();
     }
 
     private void PostUpdateGroups_BeforePolityUpdates()
     {
+        // ops in step 1 need to be executed for all updated groups before
+        // any op in step 2 is made
         foreach (CellGroup group in _updatedGroups)
         {
-            group.PostUpdate_BeforePolityUpdates();
+            group.PostUpdate_BeforePolityUpdates_Step1();
+        }
+
+        // ops in step 2 need to be executed after all ops in step 1
+        // have been made for all updated groups
+        foreach (CellGroup group in _updatedGroups)
+        {
+            group.PostUpdate_BeforePolityUpdates_Step2();
         }
     }
 
@@ -1077,6 +1128,20 @@ public class World : ISynchronizable
         }
 
         _groupsToPostUpdate_afterPolityUpdates.Clear();
+
+        foreach (CellGroup group in _groupsWithPolityCountChange)
+        {
+            group.OnPolityCountChange();
+        }
+
+        _groupsWithPolityCountChange.Clear();
+
+        foreach (CellGroup group in _groupsWithCoreCountChange)
+        {
+            group.OnCoreCountChange();
+        }
+
+        _groupsWithCoreCountChange.Clear();
     }
 
     private void AfterUpdateGroupCleanup() // This function cleans up flags and other properties of cell groups set by events or faction/polity updates
@@ -1089,16 +1154,9 @@ public class World : ISynchronizable
         _groupsToCleanupAfterUpdate.Clear();
     }
 
-    private void SplitFactions()
-    {
-        foreach (Faction faction in _factionsToSplit)
-        {
-            faction.Split();
-        }
-
-        _factionsToSplit.Clear();
-    }
-
+    /// <summary>
+    /// Updates all factions marked for update
+    /// </summary>
     private void UpdateFactions()
     {
         FactionsHaveBeenUpdated = true;
@@ -1109,6 +1167,51 @@ public class World : ISynchronizable
         }
 
         _factionsToUpdate.Clear();
+    }
+
+    private void TryAssignFactionEvents()
+    {
+        foreach (Faction faction in _factionsToAssignEventsTo)
+        {
+            faction.TryAssignEvents();
+        }
+
+        _factionsToAssignEventsTo.Clear();
+    }
+
+    private void TryAssignGroupEvents()
+    {
+        foreach (CellGroup group in _groupsToApplyEventsTo)
+        {
+            group.TryAssignEvents();
+        }
+
+        _groupsToApplyEventsTo.Clear();
+    }
+
+    private void ApplyFactionStatusChanges()
+    {
+        foreach (Faction faction in _factionsWithStatusChanges)
+        {
+            faction.ApplyStatusChange();
+        }
+
+        _factionsWithStatusChanges.Clear();
+    }
+
+    /// <summary>
+    /// Cleans up all factions that were marked for cleanup
+    /// </summary>
+    private void CleanupFactions()
+    {
+        FactionsHaveBeenUpdated = false;
+
+        foreach (Faction faction in _factionsToCleanup)
+        {
+            faction.Cleanup();
+        }
+
+        _factionsToCleanup.Clear();
     }
 
     private void RemoveFactions()
@@ -1133,19 +1236,30 @@ public class World : ISynchronizable
         _politiesToUpdate.Clear();
     }
 
-    private void UpdatePolityClusters()
+    private void UpdateTerritories()
     {
-        PolityClustersHaveBeenUpdated = true;
+        // To avoid update conflicts we must make sure to do all remove
+        // operations before all add operations
 
-        foreach (Polity polity in _politiesThatNeedClusterUpdate)
+        foreach (Territory territory in _territoriesToUpdate)
         {
-            if (!polity.StillPresent)
-                continue;
-
-            polity.ClusterUpdate();
+            territory.RemoveCells();
         }
 
-        _politiesThatNeedClusterUpdate.Clear();
+        foreach (Territory territory in _territoriesToUpdate)
+        {
+            territory.AddCells();
+        }
+
+        // After we have added and removed all pertinent cells, we can perform
+        // all remaining territory adjustments
+
+        foreach (Territory territory in _territoriesToUpdate)
+        {
+            territory.Update();
+        }
+
+        _territoriesToUpdate.Clear();
     }
 
     private void RemovePolities()
@@ -1165,139 +1279,224 @@ public class World : ISynchronizable
         return Update();
     }
 
-    public bool EvaluateEventsToHappen()
+    /// <summary>
+    /// Increases the count of evaluated events (for debug mode)
+    /// </summary>
+    /// <param name="worldEvent">the event that was evaluated</param>
+    public void IncreaseEvaluatedEventCount(WorldEvent worldEvent)
+    {
+        if (Manager.CurrentDevMode == DevMode.None)
+            return;
+
+        EventsEvaluated++;
+
+        if (Manager.CurrentDevMode == DevMode.Basic)
+            return;
+
+        string idString = worldEvent.GetType().ToString();
+
+        if (worldEvent is FactionModEvent)
+        {
+            idString = (worldEvent as FactionModEvent).GeneratorId;
+        }
+        else if (worldEvent is CellGroupModEvent)
+        {
+            idString = (worldEvent as CellGroupModEvent).GeneratorId;
+        }
+
+        if (!EventEvalStatsPerType.ContainsKey(idString))
+        {
+            EventEvalStatsPerType[idString] = new EventEvalStats();
+        }
+
+        EventEvalStatsPerType[idString].EvaluationCount++;
+    }
+
+    /// <summary>
+    /// Increases the count of triggered events (for debug mode)
+    /// </summary>
+    /// <param name="worldEvent">the event that was triggered</param>
+    public void IncreaseTriggeredEventCount(WorldEvent worldEvent)
+    {
+        if (Manager.CurrentDevMode == DevMode.None)
+            return;
+
+        EventsTriggered++;
+
+        if (Manager.CurrentDevMode == DevMode.Basic)
+            return;
+
+        string idString = worldEvent.GetType().ToString();
+
+        if (worldEvent is FactionModEvent)
+        {
+            idString = (worldEvent as FactionModEvent).GeneratorId;
+        }
+        else if (worldEvent is CellGroupModEvent)
+        {
+            idString = (worldEvent as CellGroupModEvent).GeneratorId;
+        }
+
+        if (!EventEvalStatsPerType.ContainsKey(idString))
+        {
+            throw new System.Exception("triggering event that wasn't evaluated: " + idString);
+        }
+
+        EventEvalStatsPerType[idString].TriggerCount++;
+    }
+
+    /// <summary>
+    /// Tries to evaluate any event that should happen at the current world date
+    /// </summary>
+    public void EvaluateEventsToHappen()
     {
         if (CellGroupCount <= 0)
-            return false;
+            return;
 
         //
         // Evaluate Events that will happen at the current date
         //
 
-        _dateToSkipTo = CurrentDate + 1;
+        _dateToSkipTo = CurrentDate + (Manager.SimulationPerformingStep ? 1 : MaxTimeToSkip);
 
         Profiler.BeginSample("Evaluate Events");
 
-        while (true)
+        Profiler.BeginSample("Find Leftmost");
+
+        // This will clean up any leftmost event which is no longer valid
+        _eventsToHappen.FindLeftmost(ValidateEventsToHappenNode, InvalidEventsToHappenNodeEffect);
+
+        Profiler.EndSample();// ("Find Leftmost");
+
+        // FindLeftMost() might have removed events so we need to check if there are events to happen left
+        if (_eventsToHappen.Count <= 0)
         {
-            //if (_eventsToHappen.Count <= 0) break;
-
-            _eventsToHappen.FindLeftmost(ValidateEventsToHappenNode, InvalidEventsToHappenNodeEffect);
-
-            // FindLeftMost() might have removed events so we need to check if there are events to happen left
-            if (_eventsToHappen.Count <= 0) break;
-
-            WorldEvent eventToHappen = _eventsToHappen.Leftmost;
-
-            if (eventToHappen.TriggerDate < 0)
-            {
-                throw new System.Exception("eventToHappen.TriggerDate less than zero: " + eventToHappen);
-            }
-
-            if (eventToHappen.TriggerDate > CurrentDate)
-            {
-#if DEBUG
-                if ((Manager.RegisterDebugEvent != null) && (Manager.TracingData.Priority <= 0))
-                {
-                    string message = "TriggerDate: " + eventToHappen.TriggerDate +
-                        ", event type: " + eventToHappen.GetType();
-
-                    message += ", current date: " + CurrentDate;
-
-                    SaveLoadTest.DebugMessage debugMessage =
-                        new SaveLoadTest.DebugMessage("EvaluateEventsToHappen.eventToHappen - Id: " + eventToHappen.Id, message);
-
-                    Manager.RegisterDebugEvent("DebugMessage", debugMessage);
-                }
-#endif
-
-                long maxDate = CurrentDate + MaxTimeToSkip;
-
-#if DEBUG
-                if (maxDate >= World.MaxSupportedDate)
-                {
-                    Debug.LogWarning("'maxDate' shouldn't be greater than " + World.MaxSupportedDate + " (date = " + maxDate + ")");
-                }
-#endif
-
-                if (maxDate < 0)
-                {
-                    throw new System.Exception("Surpassed date limit (Int64.MaxValue)");
-                }
-
-                _dateToSkipTo = (eventToHappen.TriggerDate < maxDate) ? eventToHappen.TriggerDate : maxDate;
-                break;
-            }
-
-            _eventsToHappen.RemoveLeftmost();
-            EventsToHappenCount--;
-
-            //#if DEBUG
-            //            if ((Manager.RegisterDebugEvent != null) && (Manager.TracingData.Priority <= 0))
-            //            {
-            //                SaveLoadTest.DebugMessage debugMessage = new SaveLoadTest.DebugMessage("Event Being Triggered", "Triggering");
-
-            //                Manager.RegisterDebugEvent("DebugMessage", debugMessage);
-            //            }
-            //#endif
-
-#if DEBUG
-            //string eventTypeName = eventToHappen.GetType().ToString();
-
-            Profiler.BeginSample("Event CanTrigger");
-            //Profiler.BeginSample("Event CanTrigger - " + eventTypeName);
-#endif
-
-            bool canTrigger = eventToHappen.CanTrigger();
-
-#if DEBUG
-            //Profiler.EndSample();
-            Profiler.EndSample();
-#endif
-
-            if (canTrigger)
-            {
-                _eventsToHappenNow.Add(eventToHappen);
-            }
-            else
-            {
-                eventToHappen.FailedToTrigger = true;
-                eventToHappen.Destroy();
-            }
+            Profiler.EndSample();// ("Evaluate Events");
+            return;
         }
 
-        foreach (WorldEvent eventToHappen in _eventsToHappenNow)
+        WorldEvent eventToHappen = _eventsToHappen.Leftmost;
+
+        if (eventToHappen.TriggerDate < CurrentDate)
+        {
+            throw new System.Exception(
+                $"World.EvaluateEventsToHappen - eventToHappen.TriggerDate " +
+                $"({eventToHappen.TriggerDate}) less than CurrentDate ({CurrentDate})" +
+                $", eventToHappen: {eventToHappen}");
+        }
+        else if (eventToHappen.TriggerDate > MaxSupportedDate)
+        {
+            throw new System.Exception(
+                $"World.EvaluateEventsToHappen - eventToHappen.TriggerDate " +
+                $"({eventToHappen.TriggerDate}) greater than MaxSupportedDate " +
+                $"({MaxSupportedDate}), eventToHappen: {eventToHappen}");
+        }
+
+        if (eventToHappen.TriggerDate > CurrentDate)
         {
 #if DEBUG
-            string eventTypeName = eventToHappen.GetType().ToString();
+            if ((Manager.RegisterDebugEvent != null) && (Manager.TracingData.Priority <= 0))
+            {
+                string message =
+                    $"TriggerDate: {eventToHappen.TriggerDate}, " +
+                    $"event type: {eventToHappen.GetType()}";
 
+                message += $", current date: {CurrentDate}";
+
+                SaveLoadTest.DebugMessage debugMessage =
+                    new SaveLoadTest.DebugMessage(
+                        $"EvaluateEventsToHappen.eventToHappen - Id: {eventToHappen.Id}", message);
+
+                Manager.RegisterDebugEvent("DebugMessage", debugMessage);
+            }
+#endif
+
+            long maxDate = CurrentDate + MaxTimeToSkip;
+
+            if (Manager.SimulationPerformingStep)
+            {
+                // move date ahead by one single step instead
+                maxDate = CurrentDate + 1;
+                Manager.SetToPerformSimulationStep(false);
+            }
+
+            if (maxDate >= MaxSupportedDate)
+            {
+                Debug.LogWarning(
+                    $"World.EvaluateEventsToHappen - 'maxDate' is greater than " +
+                    $"{MaxSupportedDate} (date = {maxDate})");
+            }
+
+            if (maxDate < 0)
+            {
+                throw new System.Exception($"'maxDate' is invalid: {maxDate}");
+            }
+
+            _dateToSkipTo =
+                (eventToHappen.TriggerDate < maxDate) ? eventToHappen.TriggerDate : maxDate;
+
+            Profiler.EndSample();// ("Evaluate Events");
+            return;
+        }
+
+        Profiler.BeginSample("Remove Leftmost Event");
+
+        _eventsToHappen.RemoveLeftmost();
+        EventsToHappenCount--;
+
+        Profiler.EndSample();// ("Remove Leftmost Event");
+
+#if DEBUG
+        string eventTypeName = eventToHappen.GetType().ToString();
+
+        Profiler.BeginSample("Event CanTrigger");
+        Profiler.BeginSample($"Event CanTrigger - {eventTypeName}");
+#endif
+
+        bool canTrigger = eventToHappen.CanTrigger();
+
+#if DEBUG
+        Profiler.EndSample();// ("Event CanTrigger - {eventTypeName}"");
+        Profiler.EndSample();// ("Event CanTrigger");
+#endif
+
+        IncreaseEvaluatedEventCount(eventToHappen);
+
+        Profiler.EndSample();// ("Evaluate Events");
+
+        if (canTrigger)
+        {
+#if DEBUG
             if ((Manager.RegisterDebugEvent != null) && (Manager.TracingData.Priority <= 0))
             {
                 SaveLoadTest.DebugMessage debugMessage = new SaveLoadTest.DebugMessage(
-                    "EvaluateEventsToHappen eventToHappen.Id: " + eventToHappen.Id + ", eventTypeName: " + eventTypeName,
-                    "eventToHappen.SpawnDate: " + eventToHappen.SpawnDate, CurrentDate);
+                    $"EvaluateEventsToHappen eventToHappen.Id: {eventToHappen.Id}, eventTypeName: {eventTypeName}",
+                    $"eventToHappen.SpawnDate: {eventToHappen.SpawnDate}", CurrentDate);
 
                 Manager.RegisterDebugEvent("DebugMessage", debugMessage);
             }
 
             Profiler.BeginSample("Event Trigger");
-            Profiler.BeginSample("Event Trigger - " + eventTypeName);
+            Profiler.BeginSample($"Event Trigger - {eventTypeName}");
 #endif
 
             eventToHappen.Trigger();
 
+            IncreaseTriggeredEventCount(eventToHappen);
+
 #if DEBUG
-            Profiler.EndSample();
-            Profiler.EndSample();
+            Profiler.EndSample();// ($"Event Trigger - {eventTypeName}");
+            Profiler.EndSample();// ("Event Trigger");
 #endif
-            eventToHappen.Destroy();
         }
 
-        _eventsToHappenNow.Clear();
+        eventToHappen.FailedToTrigger = !canTrigger;
 
-        Profiler.EndSample();
+        Profiler.BeginSample("Destroy Event");
 
-        return true;
+        eventToHappen.Destroy();
+
+        Profiler.EndSample();// ("Destroy Event");
     }
 
     public long Update()
@@ -1305,93 +1504,141 @@ public class World : ISynchronizable
         if (CellGroupCount <= 0)
             return 0;
 
-        Profiler.BeginSample("UpdateGroups");
+        Profiler.BeginSample("Find Leftmost");
+
+        // This will clean up any leftmost event which is no longer valid
+        _eventsToHappen.FindLeftmost(ValidateEventsToHappenNode, InvalidEventsToHappenNodeEffect);
+
+        Profiler.EndSample();// ("Find Leftmost");
+
+        if ((_eventsToHappen.Count > 0) &&
+            (_eventsToHappen.Leftmost.TriggerDate == CurrentDate))
+        {
+            // Avoid updating anything if there are events that still
+            // need to happen at the current date
+            return 0;
+        }
+
+        //Profiler.BeginSample("UpdateGroups");
 
         UpdateGroups();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("MigrateGroups");
+        //Profiler.BeginSample("MigrateBands");
 
-        MigrateGroups();
+        MigratePopulations();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("PostUpdateGroups_BeforePolityUpdates");
+        //Profiler.BeginSample("PostUpdateGroups_BeforePolityUpdates");
 
         PostUpdateGroups_BeforePolityUpdates();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("ExecuteDeferredEffectsOnGroups");
+        //Profiler.BeginSample("ExecuteDeferredEffectsOnGroups");
 
         ExecuteDeferredEffectsOnGroups();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("RemoveGroups");
+        //Profiler.BeginSample("RemoveGroups");
 
         RemoveGroups();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("UpdatePolityClusters");
+        //Profiler.BeginSample("UpdateTerritories");
 
-        UpdatePolityClusters();
+        // We need to do this before polities are updated
+        UpdateTerritories();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("SetNextGroupUpdates");
+        //Profiler.BeginSample("SetNextGroupUpdates");
 
         SetNextGroupUpdates();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("SplitFactions");
-
-        SplitFactions();
-
-        Profiler.EndSample();
-
-        Profiler.BeginSample("UpdateFactions");
-
-        UpdateFactions();
-
-        Profiler.EndSample();
-
-        Profiler.BeginSample("RemoveFactions");
+        //Profiler.BeginSample("RemoveFactions");
 
         RemoveFactions();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("UpdatePolities");
+        //Profiler.BeginSample("UpdateFactions");
+
+        UpdateFactions();
+
+        //Profiler.EndSample();
+
+        //Profiler.BeginSample("UpdatePolities");
 
         UpdatePolities();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("RemovePolities");
+        //Profiler.BeginSample("RemovePolities");
 
         RemovePolities();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("PostUpdateGroups_AfterPolityUpdates");
+        //Profiler.BeginSample("PostUpdateGroups_AfterPolityUpdates");
 
         PostUpdateGroups_AfterPolityUpdates();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
 
-        Profiler.BeginSample("AfterUpdateGroupCleanup");
+        //Profiler.BeginSample("UpdateTerritories");
+
+        // Territories might have changed again after polity updates
+        UpdateTerritories();
+
+        //Profiler.EndSample();
+
+        //Profiler.BeginSample("CalculateProminenceDistancesToCores");
+
+        CalculateProminenceDistancesToCores();
+
+        //Profiler.EndSample();
+
+        //Profiler.BeginSample("AfterUpdateGroupCleanup");
 
         AfterUpdateGroupCleanup();
 
-        Profiler.EndSample();
+        //Profiler.EndSample();
+
+        //Profiler.BeginSample("ApplyFactionStatusChanges");
+
+        ApplyFactionStatusChanges();
+
+        //Profiler.EndSample();
+
+        //Profiler.BeginSample("TryAssignGroupEvents");
+
+        TryAssignGroupEvents();
+
+        //Profiler.EndSample();
+
+        //Profiler.BeginSample("TryAssignFactionEvents");
+
+        TryAssignFactionEvents();
+
+        //Profiler.EndSample();
 
         //
         // Skip to Next Event's Date
         //
+
+        Profiler.BeginSample("Find Leftmost");
+
+        // This will clean up any leftmost event which is no longer valid
+        _eventsToHappen.FindLeftmost(ValidateEventsToHappenNode, InvalidEventsToHappenNodeEffect);
+
+        Profiler.EndSample();// ("Find Leftmost");
 
         if (_eventsToHappen.Count > 0)
         {
@@ -1416,6 +1663,13 @@ public class World : ISynchronizable
 #endif
 
                 _dateToSkipTo = futureEventToHappen.TriggerDate;
+
+                if (futureEventToHappen.TriggerDate <= 0)
+                {
+                    throw new System.Exception(
+                        "Update - futureEventToHappen.TriggerDate less than or equal to 0: " +
+                        futureEventToHappen.TriggerDate + ", futureEventToHappen: " + futureEventToHappen);
+                }
             }
         }
 
@@ -1423,11 +1677,22 @@ public class World : ISynchronizable
 
         CurrentDate = _dateToSkipTo;
 
+        if (CurrentDate <= 0)
+        {
+            throw new System.Exception("Update - CurrentDate less than or equal to 0: " + CurrentDate +
+                ", _dateToSkipTo: " + _dateToSkipTo);
+        }
+        else if (CurrentDate > MaxSupportedDate)
+        {
+            throw new System.Exception("World.Update - CurrentDate (" + CurrentDate +
+                ") greater than MaxSupportedDate (" + MaxSupportedDate + "). You have reached and unnoficial end of the game...");
+        }
+
         // reset update flags
         GroupsHaveBeenUpdated = false;
-        FactionsHaveBeenUpdated = false;
         PolitiesHaveBeenUpdated = false;
-        PolityClustersHaveBeenUpdated = false;
+
+        CleanupFactions();
 
         return dateSpan;
     }
@@ -1439,7 +1704,7 @@ public class World : ISynchronizable
 
     public void InsertEventToHappen(WorldEvent eventToHappen)
     {
-        //		Profiler.BeginSample ("Insert Event To Happen");
+        Profiler.BeginSample("Insert Event To Happen");
 
         EventsToHappenCount++;
 
@@ -1453,38 +1718,41 @@ public class World : ISynchronizable
         //		}
         //		#endif
 
-        //		Profiler.EndSample ();
+        Profiler.EndSample();
     }
 
 #if DEBUG
-    public delegate void AddMigratingGroupCalledDelegate();
-
-    public static AddMigratingGroupCalledDelegate AddMigratingGroupCalled = null;
+    public delegate void AddMigratingBandsCalledDelegate();
+    public static AddMigratingBandsCalledDelegate AddMigratingPopulationCalled = null;
 #endif
 
-    public void AddMigratingGroup(MigratingGroup group)
+    /// <summary>
+    /// Adds a population set to migrate during this iteration
+    /// </summary>
+    /// <param name="migPop">migrating population object</param>
+    public void AddMigratingPopulation(MigratingPopulation migPop)
     {
 #if DEBUG
-        if (AddMigratingGroupCalled != null)
+        if (AddMigratingPopulationCalled != null)
         {
-            AddMigratingGroupCalled();
+            AddMigratingPopulationCalled();
         }
 #endif
 
-        _migratingGroups.Add(group);
+        _migratingPopulations.Add(migPop);
 
-        if (!group.SourceGroup.StillPresent)
+        if (!migPop.SourceGroup.StillPresent)
         {
-            Debug.LogWarning("Sourcegroup is no longer present. Group Id: " + group.SourceGroup.Id);
+            Debug.LogWarning("Sourcegroup is no longer present. Group Id: " + migPop.SourceGroup);
         }
 
         // Source Group needs to be updated
-        AddGroupToUpdate(group.SourceGroup);
+        AddGroupToUpdate(migPop.SourceGroup);
 
         // If Target Group is present, it also needs to be updated
-        if ((group.TargetCell.Group != null) && (group.TargetCell.Group.StillPresent))
+        if ((migPop.TargetCell.Group != null) && (migPop.TargetCell.Group.StillPresent))
         {
-            AddGroupToUpdate(group.TargetCell.Group);
+            AddGroupToUpdate(migPop.TargetCell.Group);
         }
     }
 
@@ -1506,11 +1774,14 @@ public class World : ISynchronizable
         CellGroupCount--;
     }
 
-    public CellGroup GetGroup(long id)
+    /// <summary>
+    /// Returns the cellgroup identified by the id
+    /// </summary>
+    /// <param name="id">the group's id</param>
+    /// <returns></returns>
+    public CellGroup GetGroup(Identifier id)
     {
-        CellGroup group;
-
-        _cellGroups.TryGetValue(id, out group);
+        _cellGroups.TryGetValue(id, out CellGroup group);
 
         return group;
     }
@@ -1521,7 +1792,7 @@ public class World : ISynchronizable
     public static AddGroupToUpdateCalledDelegate AddGroupToUpdateCalled = null;
 #endif
 
-    public void AddGroupToUpdate(CellGroup group)
+    public void AddGroupToUpdate(CellGroup group, bool warnIfUnexpected = true)
     {
 #if DEBUG
         if ((Manager.RegisterDebugEvent != null) && (Manager.TracingData.Priority <= 1))
@@ -1538,7 +1809,7 @@ public class World : ISynchronizable
                 string callingMethod2 = method.Name;
                 string callingClass2 = method.DeclaringType.ToString();
 
-                string groupId = "Id:" + group.Id + "|Long:" + group.Longitude + "|Lat:" + group.Latitude;
+                string groupId = "Id: " + group + " Pos: " + group.Position;
 
                 SaveLoadTest.DebugMessage debugMessage = new SaveLoadTest.DebugMessage(
                     "AddGroupToUpdate - Group:" + groupId,
@@ -1566,15 +1837,61 @@ public class World : ISynchronizable
 
         if (GroupsHaveBeenUpdated)
         {
-            Debug.LogWarning("Trying to add group to update after groups have already been updated this iteration. Id: " + group.Id);
+            if (warnIfUnexpected)
+            {
+                Debug.LogWarning($"Trying to add group to update after groups have already been updated this iteration. Id: {group}");
+            }
+            return;
         }
 
         if (!group.StillPresent)
         {
-            Debug.LogWarning("Group to update is no longer present. Id: " + group.Id);
+            if (warnIfUnexpected)
+            {
+                Debug.LogWarning($"Group to update is no longer present. Id: {group}");
+            }
+            return;
         }
 
         _groupsToUpdate.Add(group);
+    }
+
+    public void AddPromToSetCoreDistFor(PolityProminence prominence, bool calculateFirst = true)
+    {
+        if ((prominence == null) || !prominence.StillPresent)
+        {
+            throw new System.ArgumentException("prominence is null or no longer present");
+        }
+
+        if (calculateFirst)
+        {
+            _promsWithCoreDistToCalculate.Add(prominence);
+        }
+        else
+        {
+            _promsWithCoreDistToDefault.Add(prominence);
+        }
+    }
+
+    public void RemovePromToSetCoreDistFor(PolityProminence prominence)
+    {
+        if (prominence == null)
+        {
+            throw new System.ArgumentException("prominence is null");
+        }
+        
+        _promsWithCoreDistToCalculate.Remove(prominence);
+        _promsWithCoreDistToDefault.Remove(prominence);
+    }
+
+    public void AddGroupWithPolityCountChange(CellGroup group)
+    {
+        _groupsWithPolityCountChange.Add(group);
+    }
+
+    public void AddGroupWithCoreCountChange(CellGroup group)
+    {
+        _groupsWithCoreCountChange.Add(group);
     }
 
     public void AddGroupToRemove(CellGroup group)
@@ -1589,14 +1906,14 @@ public class World : ISynchronizable
         LanguageCount++;
     }
 
-    public void RemoveLanguage(Region language)
+    public void RemoveLanguage(Language language)
     {
         _languages.Remove(language.Id);
 
         LanguageCount--;
     }
 
-    public Language GetLanguage(long id)
+    public Language GetLanguage(Identifier id)
     {
         _languages.TryGetValue(id, out Language language);
 
@@ -1610,7 +1927,7 @@ public class World : ISynchronizable
         RegionCount++;
     }
 
-    public RegionInfo GetRegionInfo(long id)
+    public RegionInfo GetRegionInfo(Identifier id)
     {
         RegionInfo regionInfo;
 
@@ -1629,7 +1946,7 @@ public class World : ISynchronizable
         }
     }
 
-    public Agent GetMemorableAgent(long id)
+    public Agent GetMemorableAgent(Identifier id)
     {
         Agent agent;
 
@@ -1645,7 +1962,7 @@ public class World : ISynchronizable
         FactionCount++;
     }
 
-    public FactionInfo GetFactionInfo(long id)
+    public FactionInfo GetFactionInfo(Identifier id)
     {
         FactionInfo factionInfo = null;
 
@@ -1654,7 +1971,7 @@ public class World : ISynchronizable
         return factionInfo;
     }
 
-    public Faction GetFaction(long id)
+    public Faction GetFaction(Identifier id)
     {
         FactionInfo factionInfo;
 
@@ -1666,22 +1983,12 @@ public class World : ISynchronizable
         return factionInfo.Faction;
     }
 
-    public bool ContainsFactionInfo(long id)
+    public bool ContainsFactionInfo(Identifier id)
     {
         return _factionInfos.ContainsKey(id);
     }
 
-    public void AddFactionToSplit(Faction faction)
-    {
-        if (!faction.StillPresent)
-        {
-            Debug.LogWarning("Faction to split no longer present. Id: " + faction.Id + ", Date: " + CurrentDate);
-        }
-
-        _factionsToSplit.Add(faction);
-    }
-
-    public void AddFactionToUpdate(Faction faction)
+    public void AddFactionToUpdate(Faction faction, bool warnIfUnexpected = true)
     {
 #if DEBUG
         if ((Manager.RegisterDebugEvent != null) && (Manager.TracingData.Priority <= 1))
@@ -1705,16 +2012,12 @@ public class World : ISynchronizable
 
                 string callingClass = method.DeclaringType.ToString();
 
-                int knowledgeValue = 0;
-
-                faction.Culture.TryGetKnowledgeValue(SocialOrganizationKnowledge.KnowledgeId, out knowledgeValue);
+                faction.Culture.TryGetKnowledgeValue(SocialOrganizationKnowledge.KnowledgeId, out float knowledgeValue);
 
                 SaveLoadTest.DebugMessage debugMessage = new SaveLoadTest.DebugMessage(
-                    "World:AddFactionToUpdate - Faction Id:" + faction.Id,
-                    "CurrentDate: " + CurrentDate +
-                    ", Social organization knowledge value: " + knowledgeValue +
-                    ", Calling method: " + callingClass + "." + callingMethod +
-                    "", CurrentDate);
+                    $"World:AddFactionToUpdate - Faction Id: {faction.Id}",
+                    $"CurrentDate: {CurrentDate}, Social organization knowledge value: {knowledgeValue}" +
+                    $", Calling method: {callingClass}.{callingMethod}", CurrentDate);
 
                 Manager.RegisterDebugEvent("DebugMessage", debugMessage);
             }
@@ -1723,34 +2026,68 @@ public class World : ISynchronizable
 
         if (FactionsHaveBeenUpdated)
         {
-            System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace();
-
-            System.Reflection.MethodBase method = stackTrace.GetFrame(1).GetMethod();
-            string callingMethod = method.Name;
-
-            int frame = 2;
-            while (callingMethod.Contains("SetFactionUpdates")
-                || callingMethod.Contains("SetToUpdate"))
+            if (warnIfUnexpected)
             {
-                method = stackTrace.GetFrame(frame).GetMethod();
-                callingMethod = method.Name;
-
-                frame++;
+                System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace();
+                Debug.LogWarning(
+                    $"Trying to add faction to update after factions have already been updated this iteration. Id: {faction.Id}, stackTrace:\n{stackTrace}");
             }
-
-            string callingClass = method.DeclaringType.ToString();
-
-            Debug.LogWarning(
-                "Trying to add faction to update after factions have already been updated this iteration. Id: " +
-                faction.Id + ", Calling method: " + callingClass + "." + callingMethod);
+            return;
         }
 
         if (!faction.StillPresent)
         {
-            Debug.LogWarning("Faction to update no longer present. Id: " + faction.Id + ", Date: " + CurrentDate);
+            Debug.LogWarning($"Faction to update no longer present. Id: {faction.Id}, Date: {CurrentDate}");
+            return;
         }
 
         _factionsToUpdate.Add(faction);
+    }
+
+    public void AddGroupToAssignEventsTo(CellGroup group)
+    {
+        if (!group.StillPresent)
+            return;
+
+        _groupsToApplyEventsTo.Add(group);
+    }
+
+    public void AddFactionToAssignEventsTo(Faction faction)
+    {
+        if (!faction.StillPresent)
+            return;
+
+        _factionsToAssignEventsTo.Add(faction);
+    }
+
+    /// <summary>
+    /// Adds a new faction to cleanup during the cleanup phase
+    /// </summary>
+    /// <param name="faction">faction to cleanup</param>
+    public void AddFactionToCleanup(Faction faction)
+    {
+        if (!faction.StillPresent)
+        {
+            Debug.LogWarning(
+                "Faction to cleanup no longer present. Id: " + faction.Id + ", Date: " + CurrentDate);
+        }
+
+        _factionsToCleanup.Add(faction);
+    }
+
+    /// <summary>
+    /// Adds a faction that had a status change
+    /// </summary>
+    /// <param name="faction">faction that had a status change</param>
+    public void AddFactionWithStatusChange(Faction faction)
+    {
+        if (!faction.StillPresent)
+        {
+            Debug.LogWarning(
+                "Faction with status change no longer present. Id: " + faction.Id + ", Date: " + CurrentDate);
+        }
+
+        _factionsWithStatusChanges.Add(faction);
     }
 
     public void AddFactionToRemove(Faction faction)
@@ -1758,9 +2095,27 @@ public class World : ISynchronizable
         _factionsToRemove.Add(faction);
     }
 
-    public void AddPolityInfo(PolityInfo polityInfo)
+    public IEnumerable<Polity> GetActivePolities()
     {
-        _polityInfos.Add(polityInfo.Id, polityInfo);
+        foreach (var polityInfo in _polityInfos.Values)
+        {
+            if (polityInfo.Polity != null)
+            {
+                yield return polityInfo.Polity;
+            }
+        }
+    }
+
+    public void AddPolityInfo(Polity polity)
+    {
+        _polityInfos.Add(polity.Id, polity.Info);
+
+        PolityCount++;
+    }
+
+    public void AddPolityInfo(PolityInfo info)
+    {
+        _polityInfos.Add(info.Id, info);
 
         PolityCount++;
     }
@@ -1770,7 +2125,7 @@ public class World : ISynchronizable
         return _polityInfos.Values;
     }
 
-    public PolityInfo GetPolityInfo(long id)
+    public PolityInfo GetPolityInfo(Identifier id)
     {
         if (!_polityInfos.TryGetValue(id, out PolityInfo polityInfo))
         {
@@ -1780,7 +2135,7 @@ public class World : ISynchronizable
         return polityInfo;
     }
 
-    public Polity GetPolity(long id)
+    public Polity GetPolity(Identifier id)
     {
         if (!_polityInfos.TryGetValue(id, out PolityInfo polityInfo))
         {
@@ -1790,7 +2145,7 @@ public class World : ISynchronizable
         return polityInfo.Polity;
     }
 
-    public void AddPolityToUpdate(Polity polity)
+    public void AddPolityToUpdate(Polity polity, bool warnIfUnexpected = true)
     {
 #if DEBUG
         if ((Manager.RegisterDebugEvent != null) && (Manager.TracingData.Priority <= 1))
@@ -1825,31 +2180,23 @@ public class World : ISynchronizable
 
         if (PolitiesHaveBeenUpdated)
         {
-            Debug.LogWarning("Trying to add polity to update after polities have already been updated this iteration. Id: " + polity.Id);
+            if (warnIfUnexpected)
+            {
+                System.Diagnostics.StackTrace stackTrace = new System.Diagnostics.StackTrace();
+                Debug.LogWarning(
+                    $"Trying to add polity to update after polities have already been updated this iteration. Id: {polity.Id}, stackTrace:\n" + stackTrace);
+            }
+            return;
         }
 
         if (!polity.StillPresent)
         {
-            Debug.LogWarning("Polity to update no longer present. Id: " + polity.Id + ", Date: " + CurrentDate);
+            Debug.LogWarning($"Polity to update no longer present. Id: {polity.Id}, Date: {CurrentDate}");
+            return;
         }
 
         _politiesToUpdate.Add(polity);
         polity.WillBeUpdated = true;
-    }
-
-    public void AddPolityThatNeedsClusterUpdate(Polity polity)
-    {
-        if (PolityClustersHaveBeenUpdated)
-        {
-            Debug.LogWarning("Trying to add polity with clusters to update after polity clusters have already been updated this iteration. Id: " + polity.Id);
-        }
-
-        if (!polity.StillPresent)
-        {
-            Debug.LogWarning("Polity with clusters to update no longer present. Id: " + polity.Id + ", Date: " + CurrentDate);
-        }
-
-        _politiesThatNeedClusterUpdate.Add(polity);
     }
 
     public void AddPolityToRemove(Polity polity)
@@ -1857,19 +2204,73 @@ public class World : ISynchronizable
         _politiesToRemove.Add(polity);
     }
 
-    public void AddDecisionToResolve(Decision decision)
+    public void AddTerritoryToUpdate(Territory territory)
     {
-        _decisionsToResolve.Enqueue(decision);
+        _territoriesToUpdate.Add(territory);
     }
 
-    public bool HasDecisionsToResolve()
+    public void AddDecisionToResolve(ModDecisionData initializer, string triggerPrio)
     {
-        return _decisionsToResolve.Count > 0;
+        switch (triggerPrio)
+        {
+            case DecisionTriggerPriority.Decision:
+                _highPrioDecisionsToResolve.Enqueue(initializer);
+                break;
+
+            case DecisionTriggerPriority.Action:
+                _lowPrioDecisionsToResolve.Enqueue(initializer);
+                break;
+
+            case DecisionTriggerPriority.Event:
+                _lowPrioDecisionsToResolve.Enqueue(initializer);
+                break;
+        }
     }
 
-    public Decision PullDecisionToResolve()
+    public void AddEffectToResolve(IEffectExpression effect)
     {
-        return _decisionsToResolve.Dequeue();
+        _effectsToResolve.Enqueue(effect);
+    }
+
+    public void SetActionToExecute(ModAction action)
+    {
+        _actionToExecute = action;
+    }
+
+    public bool HasModDecisionsToResolve()
+    {
+        return
+            (_lowPrioDecisionsToResolve.Count > 0) ||
+            (_highPrioDecisionsToResolve.Count > 0);
+    }
+
+    public bool HasEffectsToResolve()
+    {
+        return _effectsToResolve.Count > 0;
+    }
+
+    public ModDecisionData PullModDecisionToResolve()
+    {
+        if (_highPrioDecisionsToResolve.Count > 0)
+            return _highPrioDecisionsToResolve.Dequeue();
+
+        if (_lowPrioDecisionsToResolve.Count > 0)
+            return _lowPrioDecisionsToResolve.Dequeue();
+
+        return null;
+    }
+
+    public IEffectExpression PullEffectToResolve()
+    {
+        return _effectsToResolve.Dequeue();
+    }
+
+    public ModAction PullActionToExecute()
+    {
+        ModAction action = _actionToExecute;
+        _actionToExecute = null;
+
+        return action;
     }
 
     public void AddEventMessage(WorldEventMessage eventMessage)
@@ -1904,9 +2305,9 @@ public class World : ISynchronizable
 
     private void LoadRegionInfos()
     {
-        foreach (RegionInfo r in RegionInfos)
+        foreach (RegionInfo rInfo in RegionInfos)
         {
-            _regionInfos.Add(r.Id, r);
+            _regionInfos.Add(rInfo.Id, rInfo);
         }
 
 #if DEBUG
@@ -1940,9 +2341,9 @@ public class World : ISynchronizable
 
     private void LoadLanguages()
     {
-        foreach (Language l in Languages)
+        foreach (Language language in Languages)
         {
-            _languages.Add(l.Id, l);
+            _languages.Add(language.Id, language);
         }
 
 #if DEBUG
@@ -1980,6 +2381,11 @@ public class World : ISynchronizable
             {
                 pInfo.Polity.Info = pInfo;
                 pInfo.Polity.World = this;
+
+                if (pInfo.Polity.IsUnderPlayerFocus)
+                {
+                    PolitiesUnderPlayerFocus.Add(pInfo.Polity);
+                }
             }
         }
 
@@ -1989,15 +2395,20 @@ public class World : ISynchronizable
             {
                 fInfo.Faction.Info = fInfo;
                 fInfo.Faction.World = this;
+
+                if (fInfo.Faction.IsUnderPlayerGuidance)
+                {
+                    GuidedFaction = fInfo.Faction;
+                }
             }
         }
 
-        foreach (CellGroup g in CellGroups)
+        foreach (CellGroup group in CellGroups)
         {
-            g.World = this;
-            g.PrefinalizeLoad();
+            group.World = this;
+            group.PrefinalizeLoad();
 
-            _cellGroups.Add(g.Id, g);
+            _cellGroups.Add(group.Id, group);
         }
 
         // Segment 2
@@ -2093,7 +2504,9 @@ public class World : ISynchronizable
 
         foreach (string id in ExistingDiscoveryIds)
         {
-            Discovery discovery = Discovery.GetDiscovery(id);
+            IDiscovery discovery = null;
+
+            discovery = GetDiscovery(id);
 
             if (discovery == null)
             {
@@ -2104,12 +2517,27 @@ public class World : ISynchronizable
         }
     }
 
+    public static IDiscovery GetDiscovery(string id)
+    {
+        if (Discovery.Discoveries.TryGetValue(id, out Discovery d))
+        {
+            return d;
+        }
+
+        if (Discovery033.Discoveries.TryGetValue(id, out Discovery033 d33))
+        {
+            return d33;
+        }
+
+        return null;
+    }
+
     public void FinalizeLoad()
     {
         FinalizeLoad(0, 1, null);
     }
 
-    public void MigrationTagGroup(HumanGroup group)
+    public void MigrationTagGroup(CellGroup group)
     {
         MigrationUntagGroup();
 
@@ -2135,7 +2563,7 @@ public class World : ISynchronizable
             if (heightmap == null)
             {
                 ProgressCastMethod(_accumulatedProgress, "Generating terrain altitude...");
-                
+
                 GenerateTerrainAltitude();
             }
             else
@@ -2176,7 +2604,7 @@ public class World : ISynchronizable
         if ((type & GenerationType.Rainfall) == GenerationType.Rainfall)
         {
             ProgressCastMethod(_accumulatedProgress, "Calculating rainfall...");
-            
+
             ResetRainfallDependencies();
             GenerateTerrainRainfall();
         }
@@ -2193,9 +2621,14 @@ public class World : ISynchronizable
 
         ProgressCastMethod(_accumulatedProgress, "Generating Drainage Basins...");
 
+        SetCellsToEvalForDrainange();
+
         GenerateDrainageBasins();
-        GenerateDrainageBasins(false); // repeat to simulate geological scale erosion
-        
+        //GenerateDrainageBasins(false); // repeat to simulate geological scale erosion
+
+        _cellsToDrain.Clear();
+        NeedsDrainageRegeneration = false;
+
         ProgressCastMethod(_accumulatedProgress, "Calculating hilliness...");
 
         CalculateTerrainHilliness();
@@ -2255,7 +2688,7 @@ public class World : ISynchronizable
             for (int j = 0; j < sizeY; j++)
             {
                 TerrainCell cell = TerrainCells[i][j];
-                
+
                 if (cell.Survivability < MinSurvivabilityForRandomGroupPlacement) continue;
 
                 SuitableCells.Add(cell);
@@ -2505,7 +2938,7 @@ public class World : ISynchronizable
                 {
                     greyscaleValue /= totalPixels;
                 }
-                
+
                 CalculateAndSetAltitude(i, j, greyscaleValue, true);
             }
 
@@ -2532,16 +2965,16 @@ public class World : ISynchronizable
         // Add some extra noise to enhance river formation
         float radius6 = 64f;
         float radius7 = 128f;
-        
+
         float value6 = GetRandomNoiseFromPolarCoordinates(cell.Alpha, cell.Beta, radius6, _altitudeNoiseOffset6);
         float value7 = GetRandomNoiseFromPolarCoordinates(cell.Alpha, cell.Beta, radius7, _altitudeNoiseOffset7);
-        
+
         float valueOffsetA = Mathf.Lerp(valueOffset, value6 * valueOffset, 0.2f);
         valueOffsetA = Mathf.Lerp(valueOffsetA, value7 * valueOffset, 0.1f);
 
         float value = cell.BaseAltitudeValue + valueOffsetA;
 
-        CalculateAndSetAltitude(cell, value, true);
+        CalculateAndSetAltitude(cell, value, true, true);
 
         _cellsToRegen.Add(cell);
         _cellsToInit.Add(cell);
@@ -2554,49 +2987,31 @@ public class World : ISynchronizable
         }
 
         // Add neighboor cells that will need to be reinitialized
-        foreach (TerrainCell nCell in cell.Neighbors.Values)
+        foreach (TerrainCell nCell in cell.NeighborList)
         {
             _cellsToInit.Add(nCell);
         }
     }
 
-    private float CalculateAltitudePlusAccumulation(TerrainCell cell)
+    /// <summary>
+    /// Generates drainage basins within a set of cells.
+    /// TODO: unused function. Make it work or remove
+    /// </summary>
+    public void PerformTerrainAlterationDrainageRegen()
     {
-        return cell.Altitude + cell.WaterAccumulation * OverflowFactor * RainfallToHeightConversionFactor;
-    }
-
-    public void UpdateWater(TerrainCell cell)
-    {
-        cell.WaterAccumulation += cell.Buffer;
-
-        MaxWaterAccumulation = Mathf.Max(MaxWaterAccumulation, cell.WaterAccumulation);
-    }
-
-    public void PerformTerrainAlterationDrainageRegen(bool doTerrainModification = true)
-    {
-        HashSet<TerrainCell> cellsToModify = null;
-
-        if (doTerrainModification)
+        while (_drainageEvalHeap.Count > 0)
         {
-            cellsToModify = new HashSet<TerrainCell>();
-        }
-
-        while (_drainageHeap.Count > 0)
-        {
-            TerrainCell cell = _drainageHeap.Extract(false);
-            //_cellsToDrainage.Remove(cell);
+            TerrainCell cell = _drainageEvalHeap.Extract(false);
 
             if (!cell.DrainageDone)
             {
                 bool reInsert = false;
 
-                UpdateWater(cell);
+                float cellAltitude = Mathf.Max(0, cell.Altitude);
 
-                float cellAltitude = Mathf.Max(0, CalculateAltitudePlusAccumulation(cell));
-
-                foreach (TerrainCell nCell in cell.Neighbors.Values)
+                foreach (TerrainCell nCell in cell.NeighborList)
                 {
-                    float nCellAltitude = Mathf.Max(0, CalculateAltitudePlusAccumulation(nCell));
+                    float nCellAltitude = Mathf.Max(0, nCell.Altitude);
 
                     if (nCellAltitude > cellAltitude)
                     {
@@ -2606,41 +3021,20 @@ public class World : ISynchronizable
 
                 if (reInsert)
                 {
-                    _drainageHeap.Insert(cell);
+                    _drainageEvalHeap.Insert(cell);
                     continue;
                 }
 
-                if (doTerrainModification)
-                {
-                    cellsToModify.Add(cell);
-                }
+                cell.UpdateDrainage();
             }
 
             DrainToNeighbors(cell, AddToDrainageRegen);
         }
-
-        if (doTerrainModification)
-        {
-            foreach (TerrainCell cell in cellsToModify)
-            {
-                DrainModifyCell(cell);
-            }
-        }
     }
 
-    public void RepeatTerrainAlterationDrainageRegen()
-    {
-        _cellsToDrainage.Clear();
-        _drainageHeap.Clear();
-
-        foreach (TerrainCell cell in _cellsToFinalizeDrainageRegen)
-        {
-            AddToDrainageRegen(cell, resetTerrain: false);
-        }
-
-        PerformTerrainAlterationDrainageRegen(false);
-    }
-
+    /// <summary>
+    /// Finishes terrain generation on cells afected by drainage regeneration and then cleanups.
+    /// </summary>
     public void FinalizeTerrainAlterationDrainageRegen()
     {
         foreach (TerrainCell cell in _cellsToFinalizeDrainageRegen)
@@ -2661,8 +3055,8 @@ public class World : ISynchronizable
 
         _cellsToInitAfterDrainageRegen.Clear();
         _cellsToFinalizeDrainageRegen.Clear();
-        _cellsToDrainage.Clear();
-        _drainageHeap.Clear();
+        _cellsToDrain.Clear();
+        _drainageEvalHeap.Clear();
     }
 
     /// <summary>
@@ -2670,19 +3064,24 @@ public class World : ISynchronizable
     /// after applying a terrain modification editor brush.
     /// </summary>
     /// <param name="cell"> The cell to regenerate drainage for.</param>
-    /// <param name="resetDrainage"> Indicate if the cells drainage values should be reset 
+    /// <param name="resetDrainage"> Indicate if the cells drainage values should be reset
     /// to defaults before adding to the heap.</param>
-    /// <param name="resetTerrain"> Indicate if the cell's altitude and temperature should also be reset 
+    /// <param name="resetTerrain"> Indicate if the cell's altitude and temperature should also be reset
     /// to their original values before adding to the heap.</param>
+    /// <param name="callByBrush"> Indicates if this cells was added directly by effect of an editor brush.</param>
     /// <returns>
-    ///   <c>true</c> if this is the first time this function has been called on this 
+    ///   <c>true</c> if this is the first time this function has been called on this
     ///   particular cell during this regeneration cycle. Otherwise, <c>false</c>.
     /// </returns>
-    public bool AddToDrainageRegen(TerrainCell cell, bool resetDrainage = true, bool resetTerrain = true)
+    public bool AddToDrainageRegen(
+        TerrainCell cell,
+        bool resetDrainage = true,
+        bool resetTerrain = true,
+        bool callByBrush = false)
     {
         bool justAdded = true;
 
-        if (_cellsToDrainage.Contains(cell))
+        if (_cellsToDrain.Contains(cell))
         {
             justAdded = false;
         }
@@ -2690,14 +3089,14 @@ public class World : ISynchronizable
         {
             _cellsToInitAfterDrainageRegen.Add(cell);
             Manager.ActiveEditorBrushAction.AddCellBeforeModification(cell);
-            foreach (TerrainCell nCell in cell.Neighbors.Values)
+            foreach (TerrainCell nCell in cell.NeighborList)
             {
                 _cellsToInitAfterDrainageRegen.Add(nCell);
                 Manager.ActiveEditorBrushAction.AddCellBeforeModification(nCell);
             }
 
-            _cellsToDrainage.Add(cell);
-            _drainageHeap.Insert(cell);
+            _cellsToDrain.Add(cell);
+            _drainageEvalHeap.Insert(cell);
 
             if (resetDrainage)
             {
@@ -2709,13 +3108,13 @@ public class World : ISynchronizable
             }
         }
 
-        if (resetDrainage)
+        if ((justAdded || callByBrush) && resetDrainage)
         {
-            if (cell.Altitude > 0)
+            if (!cell.IsBelowSeaLevel)
             {
                 // Rainfall could have been altered after this cell had already been added to the drainageHeap,
                 // so we need to update the cell's water acc accordingly.
-                cell.WaterAccumulation = cell.Rainfall;
+                cell.UpdateDrainage();
             }
         }
 
@@ -2738,9 +3137,10 @@ public class World : ISynchronizable
             GenerateTerrainBiomes(cell);
             CalculateTerrainArability(cell);
 
-            if (cell.Altitude > 0)
+            if (!cell.IsBelowSeaLevel)
             {
-                AddToDrainageRegen(cell);
+                //AddToDrainageRegen(cell, callByBrush: true);
+                ResetDrainage(cell, false);
             }
         }
 
@@ -2778,9 +3178,10 @@ public class World : ISynchronizable
         GenerateTerrainBiomes(cell);
         CalculateTerrainArability(cell);
 
-        if (cell.Altitude > 0)
+        if (!cell.IsBelowSeaLevel)
         {
-            AddToDrainageRegen(cell);
+            //AddToDrainageRegen(cell, callByBrush: true);
+            ResetDrainage(cell, false);
         }
 
         Manager.AddUpdatedCell(cell, CellUpdateType.Cell, CellUpdateSubType.Terrain);
@@ -2807,10 +3208,11 @@ public class World : ISynchronizable
         GenerateTerrainLayers(cell);
         GenerateTerrainBiomes(cell);
         CalculateTerrainArability(cell);
-        
-        if (cell.Altitude > 0)
+
+        if (!cell.IsBelowSeaLevel)
         {
-            AddToDrainageRegen(cell);
+            //AddToDrainageRegen(cell, callByBrush: true);
+            ResetDrainage(cell, false);
         }
 
         Manager.AddUpdatedCell(cell, CellUpdateType.Cell, CellUpdateSubType.Terrain);
@@ -2821,7 +3223,7 @@ public class World : ISynchronizable
     {
         if (noiseFactor > 0)
         {
-            float rngValue = 
+            float rngValue =
                 GetRandomNoiseFromPolarCoordinates(cell.Alpha, cell.Beta, noiseRadius, _layerBrushNoiseOffsets[layerId]);
 
             valueOffset *= Mathf.Lerp(1, rngValue, noiseFactor);
@@ -2834,7 +3236,7 @@ public class World : ISynchronizable
         Manager.ActiveEditorBrushAction.AddCellBeforeModification(cell);
 
         CalculateAndSetTerrainLayerValue(cell, Layer.Layers[layerId], valueOffset);
-        
+
         GenerateTerrainBiomes(cell);
         CalculateTerrainArability(cell);
 
@@ -2864,10 +3266,15 @@ public class World : ISynchronizable
 
             for (int j = 0; j < sizeY; j++)
             {
-                if (SkipIfLoaded(i, j))
-                    continue;
+                TerrainCell cell = TerrainCells[i][j];
 
-                float alpha = (j / (float)sizeY) * Mathf.PI;
+                if (SkipIfLoaded(cell))
+                {
+                    CalculateAndSetAltitude(cell, cell.BaseAltitudeValue);
+                    continue;
+                }
+
+                float alpha = j / (float)sizeY * Mathf.PI;
 
                 float value1 = GetRandomNoiseFromPolarCoordinates(alpha, beta, radius1, _altitudeNoiseOffset1);
                 float value2 = GetRandomNoiseFromPolarCoordinates(alpha, beta, radius2, _altitudeNoiseOffset2);
@@ -2937,7 +3344,7 @@ public class World : ISynchronizable
                 valueD = Mathf.Lerp(valueD, value7, 0.005f * valueC);
 
                 //valueD = valueF;
-                CalculateAndSetAltitude(i, j, valueD);
+                CalculateAndSetAltitude(cell, valueD);
             }
 
             ProgressCastMethod(_accumulatedProgress + _progressIncrement * (i + 1) / (float)sizeX);
@@ -3012,7 +3419,7 @@ public class World : ISynchronizable
 
         return collisionValue;
     }
-    
+
     private ManagerTask<int> GenerateRandomInteger(int min, int max)
     {
         return Manager.EnqueueTask(() => Random.Range(min, max));
@@ -3081,7 +3488,7 @@ public class World : ISynchronizable
         filter = filter * (1 + lengthFactor) - lengthFactor;
 
         float scaledNoise = (noise * 2) - 1;
-        
+
         int count = 5;
         float sideOffset = 0.5f + (count / 2f);
 
@@ -3098,7 +3505,7 @@ public class World : ISynchronizable
 
             if (fi <= 0)
                 continue;
-            
+
             fi /= 1 - countFactor2;
             fi *= countFactor;
 
@@ -3149,7 +3556,7 @@ public class World : ISynchronizable
         }
     }
 
-    private void CalculateAndSetAltitude(TerrainCell cell, float value, bool modified = false)
+    private void CalculateAndSetAltitude(TerrainCell cell, float value, bool modified = false, bool alteredByBrush = false)
     {
         float altitude = CalculateAltitude(value);
 
@@ -3157,10 +3564,8 @@ public class World : ISynchronizable
         cell.Altitude = altitude;
         cell.BaseAltitudeValue = value;
 
-        if (modified)
-        {
-            cell.Modified = true;
-        }
+        cell.Modified |= modified;
+        cell.TerrainAlteredBeforeDrainageRegen |= alteredByBrush;
 
         if (altitude > MaxAltitude) MaxAltitude = altitude;
         if (altitude < MinAltitude) MinAltitude = altitude;
@@ -3190,7 +3595,7 @@ public class World : ISynchronizable
         _altitudeBrushNoiseOffset = GenerateRandomOffsetVectorTask();
         _temperatureBrushNoiseOffset = GenerateRandomOffsetVectorTask();
         _rainfallBrushNoiseOffset = GenerateRandomOffsetVectorTask();
-        
+
         _layerBrushNoiseOffsets.Clear();
 
         foreach (Layer layer in Layer.Layers.Values)
@@ -3218,11 +3623,8 @@ public class World : ISynchronizable
 
         cell.Rainfall = rainfall;
         cell.BaseRainfallValue = value;
-        
-        if (modified)
-        {
-            cell.Modified = true;
-        }
+
+        cell.Modified |= modified;
 
         if (rainfall > MaxRainfall) MaxRainfall = rainfall;
         if (rainfall < MinRainfall) MinRainfall = rainfall;
@@ -3236,7 +3638,7 @@ public class World : ISynchronizable
 
         float rainfall = CalculateRainfall(value + offset);
         cell.Rainfall = rainfall;
-        
+
         if (rainfall > MaxRainfall) MaxRainfall = rainfall;
         if (rainfall < MinRainfall) MinRainfall = rainfall;
     }
@@ -3294,7 +3696,10 @@ public class World : ISynchronizable
         }
 
         if (justSetRainfallSources)
+        {
+            CalculateAndSetRainfall(cell, cell.BaseRainfallValue);
             return;
+        }
 
         float altitudeValue = Mathf.Max(0, cell.Altitude);
         float offAltitude = Mathf.Max(0, offCell.Altitude);
@@ -3319,151 +3724,6 @@ public class World : ISynchronizable
 
         float rainfallValue = Mathf.Lerp(Mathf.Abs(latitudeModifier2), altitudeModifier, 0.95f);
         rainfallValue = Mathf.Max(rainfallValue, temperatureFactor * 0.1f);
-
-        CalculateAndSetRainfall(cell, rainfallValue);
-    }
-
-    private void GenerateTerrainRainfall2(TerrainCell cell, bool justSetRainfallSources = false, bool setDependencies = true)
-    {
-        int longitude = cell.Longitude;
-        int latitude = cell.Latitude;
-
-        float radius1 = 2f;
-        float radius2 = 1f;
-        float radius3 = 16f;
-
-        float alpha = cell.Alpha;
-        float beta = cell.Beta;
-
-        float value1 = GetRandomNoiseFromPolarCoordinates(alpha, beta, radius1, _rainfallNoiseOffset1);
-        float value2 = GetRandomNoiseFromPolarCoordinates(alpha, beta, radius2, _rainfallNoiseOffset2);
-        float value3 = GetRandomNoiseFromPolarCoordinates(alpha, beta, radius3, _rainfallNoiseOffset3);
-
-        value2 = value2 * 1.5f + 0.25f;
-
-        float valueA = Mathf.Lerp(value1, value3, 0.15f);
-
-        float latitudeFactor = alpha + (((valueA * 2) - 1f) * Mathf.PI * 0.15f);
-        float latitudeModifier1 = Mathf.Sin(latitudeFactor);
-        float latitudeFactor2 = (latitudeFactor * 3);
-        float latitudeModifier2 = -latitudeModifier1 * Mathf.Sin(latitudeFactor2);
-        float latitudeFactor3 = (latitudeFactor * 6);
-        float latitudeModifier3 = -Mathf.Sin(latitudeFactor3);
-
-        int offCellX = (Width + longitude + (int)Mathf.Floor(latitudeModifier2 * Width / 40f)) % Width;
-        int offCellX2 = (Width + longitude + (int)Mathf.Floor(latitudeModifier2 * Width / 20f)) % Width;
-        int offCellX3 = (Width + longitude + (int)Mathf.Floor(latitudeModifier2 * Width / 10f)) % Width;
-        int offCellX4 = (Width + longitude + (int)Mathf.Floor(latitudeModifier2 * Width / 5f)) % Width;
-        int offCellX5 = (Width + longitude + (int)Mathf.Floor(latitudeModifier2 * Width / 2.5f)) % Width;
-        int offCellX6 = (Width + longitude + (int)Mathf.Floor(latitudeModifier2 * Width / 1.25f)) % Width;
-
-        int offCellY = Mathf.Clamp(latitude + Mathf.FloorToInt(latitudeModifier3 * Height / 20f), 0, Height - 1);
-        int offCellY2 = Mathf.Clamp(latitude + Mathf.FloorToInt(latitudeModifier3 * Height / 10f), 0, Height - 1);
-
-        TerrainCell offCell = TerrainCells[offCellX][offCellY2];
-        TerrainCell offCell2 = TerrainCells[offCellX2][offCellY];
-        TerrainCell offCell3 = TerrainCells[offCellX3][latitude];
-        TerrainCell offCell4 = TerrainCells[offCellX4][latitude];
-        TerrainCell offCell5 = TerrainCells[offCellX5][latitude];
-        TerrainCell offCell6 = TerrainCells[offCellX6][latitude];
-        //TerrainCell offCell6 = TerrainCells[longitude][offCellY];
-        //TerrainCell offCell7 = TerrainCells[longitude][offCellY2];
-
-        if (setDependencies)
-        {
-            offCell.RainfallDependentCells.Add(cell);
-            offCell2.RainfallDependentCells.Add(cell);
-            offCell3.RainfallDependentCells.Add(cell);
-            offCell4.RainfallDependentCells.Add(cell);
-            offCell5.RainfallDependentCells.Add(cell);
-            offCell6.RainfallDependentCells.Add(cell);
-            //offCell6.RainfallDependentCells.Add(cell);
-            //offCell7.RainfallDependentCells.Add(cell);
-        }
-
-        if (justSetRainfallSources)
-            return;
-
-        float altitudeDiv = MaxRainfall;
-
-        /////
-
-        float altitudeFactor = Mathf.Max(0, cell.Altitude) + 500;
-        float altitudeValue = 0;
-        float minusValue = 0;
-        float count = 1;
-        float countInc = 1f;
-
-        if (offCell.Altitude <= 0)
-        {
-            float altValue = Mathf.Clamp01((altitudeFactor - minusValue) / altitudeDiv) * 1f;
-            altitudeValue += altValue / count;
-            count += countInc;
-        }
-
-        minusValue = Mathf.Max(minusValue, offCell.Altitude);
-
-        if (offCell2.Altitude <= 0)
-        {
-            float altValue = Mathf.Clamp01((altitudeFactor - minusValue) / altitudeDiv) * 1f;
-            altitudeValue += altValue / count;
-            count += countInc;
-        }
-
-        minusValue = Mathf.Max(minusValue, offCell2.Altitude);
-
-        if (offCell3.Altitude <= 0)
-        {
-            float altValue = Mathf.Clamp01((altitudeFactor - minusValue) / altitudeDiv) * 1f;
-            altitudeValue += altValue / count;
-            count += countInc;
-        }
-
-        minusValue = Mathf.Max(minusValue, offCell3.Altitude);
-
-        if (offCell4.Altitude <= 0)
-        {
-            float altValue = Mathf.Clamp01((altitudeFactor - minusValue) / altitudeDiv) * 1f;
-            altitudeValue += altValue / count;
-            count += countInc;
-        }
-
-        minusValue = Mathf.Max(minusValue, offCell4.Altitude);
-
-        if (offCell5.Altitude <= 0)
-        {
-            float altValue = Mathf.Clamp01((altitudeFactor - minusValue) / altitudeDiv) * 1f;
-            altitudeValue += altValue / count;
-            count += countInc;
-        }
-
-        minusValue = Mathf.Max(minusValue, offCell5.Altitude);
-
-        if (offCell6.Altitude <= 0)
-        {
-            float altValue = Mathf.Clamp01((altitudeFactor - minusValue) / altitudeDiv) * 1f;
-            altitudeValue += altValue / count;
-            count += countInc;
-        }
-
-        /////
-
-        //float altitudeFactor2 = altitudeFactor;
-        //float minusValue2 = 0;
-
-        //if (offCell6.Altitude <= 0)
-        //    altitudeValue += Mathf.Clamp01((altitudeFactor2 - minusValue2) / altitudeDiv) * 1f;
-
-        //minusValue2 = Mathf.Max(minusValue2, offCell6.Altitude);
-
-        //if (offCell7.Altitude <= 0)
-        //    altitudeValue += Mathf.Clamp01((altitudeFactor2 - minusValue2) / altitudeDiv) * 1f;
-
-        ///////
-
-        float rainfallValue = Mathf.Lerp(Mathf.Abs(latitudeModifier2), altitudeValue, 0.9f);
-        rainfallValue = Mathf.Clamp01(rainfallValue * 1.1f - 0.1f);
-        //rainfallValue = Mathf.Clamp01(rainfallValue);
 
         CalculateAndSetRainfall(cell, rainfallValue);
     }
@@ -3499,9 +3759,6 @@ public class World : ISynchronizable
             {
                 TerrainCell cell = TerrainCells[i][j];
 
-                if (SkipIfLoaded(cell))
-                    continue;
-
                 cell.Altitude = cell.OriginalAltitude;
             }
 
@@ -3522,9 +3779,6 @@ public class World : ISynchronizable
             {
                 TerrainCell cell = TerrainCells[i][j];
 
-                if (SkipIfLoaded(cell))
-                    continue;
-
                 cell.Temperature = cell.OriginalTemperature;
             }
 
@@ -3534,11 +3788,15 @@ public class World : ISynchronizable
         _accumulatedProgress += _progressIncrement;
     }
 
+    /// <summary>
+    /// Resets drainage values on cell.
+    /// </summary>
+    /// <param name="cell"> Cell to reset drainage on.</param>
+    /// <param name="resetTerrain"> Indicates if terrain alterations due to drainage should be reset on cell.</param>
     private void ResetDrainage(TerrainCell cell, bool resetTerrain)
     {
-        cell.Buffer = 0;
-        cell.Buffer2 = 0;
-        cell.Buffer3 = 0;
+        cell.FeedingCells.Clear();
+
         cell.RiverId = -1;
         cell.RiverLength = 0;
         cell.DrainageDone = false;
@@ -3547,14 +3805,6 @@ public class World : ISynchronizable
         if (resetTerrain)
         {
             cell.Altitude = cell.OriginalAltitude;
-
-#if DEBUG
-            if (!cell.OriginalTemperature.IsInsideRange(MinPossibleTemperatureWithOffset - 0.5f, MaxPossibleTemperatureWithOffset + 0.5f))
-            {
-                Debug.Log("Invalid cell.OriginalTemperature: " + cell.OriginalTemperature);
-            }
-#endif
-
             cell.Temperature = cell.OriginalTemperature;
         }
     }
@@ -3576,33 +3826,185 @@ public class World : ISynchronizable
         return 1;
     }
 
-    private delegate bool addToCellsToDrainDelegate(TerrainCell cell, bool resetDrainage, bool resetAltitude);
+    private struct CellDepth
+    {
+        public TerrainCell Cell;
+        public int Depth;
+    }
+
+    private int CompareCellDepthAltitudes(CellDepth a, CellDepth b)
+    {
+        if (a.Cell.Altitude > b.Cell.Altitude) return 1;
+        if (a.Cell.Altitude < b.Cell.Altitude) return -1; 
+
+        return 0;
+    }
+
+    /// <summary>
+    /// Returns the altitude of the target cell or that of a neighbor with lower altitude than the source
+    /// cell. The idea is that drainage can channel through the target cell if it has no other option.
+    /// </summary>
+    /// <param name="targetCell"></param>
+    /// <param name="sourceCell"></param>
+    /// <returns></returns>
+    private float GetChannelledAltitude(TerrainCell targetCell, TerrainCell sourceCell, int maxDepth)
+    {
+        float targetAltitude = targetCell.Altitude;
+        float sourceAltitude = sourceCell.Altitude;
+
+        HashSet<TerrainCell> exploredCells = new HashSet<TerrainCell>();
+
+        exploredCells.Add(targetCell);
+
+        // Skip searching through the source cell
+        exploredCells.Add(sourceCell);
+
+        // Also skip cells that neighbor the source cell
+        foreach (TerrainCell cell in sourceCell.NeighborList)
+        {
+            exploredCells.Add(cell);
+        }
+
+        int heapSize = (maxDepth * 2) + 1;
+        heapSize *= heapSize;
+
+        BinaryHeap<CellDepth> cellsToExplore =
+            new BinaryHeap<CellDepth>(CompareCellDepthAltitudes, heapSize);
+
+        cellsToExplore.Insert(new CellDepth()
+        {
+            Cell = targetCell,
+            Depth = 1
+        });
+
+        float lowestAltitude = targetAltitude;
+        float lDepth = 1;
+
+        while (cellsToExplore.Count > 0)
+        {
+            CellDepth cd = cellsToExplore.Extract();
+            TerrainCell cell = cd.Cell;
+
+            float cellAltitude = Mathf.Max(0, cell.Altitude);
+
+            if (cellAltitude < lowestAltitude)
+            {
+                lowestAltitude = cellAltitude;
+                lDepth = cd.Depth;
+            }
+
+            if (lowestAltitude < sourceAltitude)
+            {
+                break;
+            }
+
+            if (cd.Depth > maxDepth)
+            {
+                continue;
+            }
+
+            foreach (TerrainCell nCell in cell.NeighborList)
+            {
+                if (exploredCells.Contains(nCell))
+                {
+                    continue;
+                }
+
+                cellsToExplore.Insert(new CellDepth()
+                {
+                    Cell = nCell,
+                    Depth = cd.Depth + 1
+                });
+
+                exploredCells.Add(nCell);
+            }
+        }
+
+        float maxAltitude = Mathf.Min(sourceAltitude, targetAltitude);
+        float newAltitude = Mathf.Lerp(maxAltitude, lowestAltitude, 1f / (float)lDepth);
+
+        return newAltitude;
+    }
+
+    private delegate bool addToCellsToDrainDelegate(TerrainCell cell, bool resetDrainage, bool resetAltitude, bool callByBrush);
 
     private void DrainToNeighbors(TerrainCell cell, addToCellsToDrainDelegate addToCellsToDrain)
     {
         float diffPow = 2.5f;
 
+        bool drainageWasDone = cell.DrainageDone;
+        bool redoDrainageForAll = !cell.DrainageDone;
+
         cell.DrainageDone = true;
+        cell.TerrainAlteredBeforeDrainageRegen = false;
 
         if (cell.WaterAccumulation < MinRiverFlow)
         {
             return;
         }
 
-        float cellAltitude = Mathf.Max(0, CalculateAltitudePlusAccumulation(cell));
+        float cellAltitude = Mathf.Max(0, cell.Altitude);
 
         Dictionary<TerrainCell, float> nAltitudes = new Dictionary<TerrainCell, float>();
 
+//#if DEBUG
+//        if ((cell.Longitude == 250) && (cell.Latitude == 125))
+//        {
+//            Debug.Log("Debugging drainage on cell " + cell.Position);
+//        }
+//#endif
+
         float totalAltDifference = 0;
-        foreach (TerrainCell nCell in cell.Neighbors.Values)
+        foreach (TerrainCell nCell in cell.NeighborList)
         {
-            float nCellAltitude = Mathf.Max(0, CalculateAltitudePlusAccumulation(nCell));
+            float nCellAltitude = Mathf.Max(0, nCell.Altitude);
             nAltitudes[nCell] = nCellAltitude;
 
             float diff = Mathf.Max(0, cellAltitude - nCellAltitude);
             diff = Mathf.Pow(diff, diffPow);
 
             totalAltDifference += diff;
+        }
+
+        // try using altitude channelling
+        if (totalAltDifference <= 0)
+        {
+            TerrainCell bestCell = cell;
+            float minAltitude = cell.Altitude;
+            float minMinAltitude = cell.Altitude;
+            foreach (TerrainCell nCell in cell.NeighborList)
+            {
+                float nCellAltitude = Mathf.Max(0, nCell.Altitude);
+                float nCellMinAltitude = Mathf.Max(0, GetChannelledAltitude(nCell, cell, 5));
+
+                if (nCellMinAltitude < minMinAltitude)
+                {
+                    minAltitude = nCellAltitude;
+                    minMinAltitude = nCellMinAltitude;
+                    bestCell = nCell;
+                    continue;
+                }
+
+                // solve draws
+                if (nCellMinAltitude == minMinAltitude)
+                {
+                    if (nCellAltitude < minAltitude)
+                    {
+                        minAltitude = nCellAltitude;
+                        bestCell = nCell;
+                    }
+                }
+            }
+
+            if (bestCell != cell)
+            {
+                nAltitudes[bestCell] = minMinAltitude;
+
+                float diff = Mathf.Max(0, cellAltitude - minMinAltitude);
+                diff = Mathf.Pow(diff, diffPow);
+
+                totalAltDifference += diff;
+            }
         }
 
         if (totalAltDifference <= 0)
@@ -3616,7 +4018,9 @@ public class World : ISynchronizable
         foreach (KeyValuePair<Direction, TerrainCell> nPair in cell.Neighbors)
         {
             TerrainCell nCell = nPair.Value;
-            
+
+            redoDrainageForAll |= nCell.TerrainAlteredBeforeDrainageRegen;
+
             float nCellAltitude = nAltitudes[nCell];
 
             float diff = Mathf.Max(0, cellAltitude - nCellAltitude);
@@ -3635,16 +4039,17 @@ public class World : ISynchronizable
                 continue;
             }
 
-            if (SkipIfLoaded(nPair.Value))
-                continue;
-
             cellsToKeep.Add(nPair);
         }
 
         foreach (KeyValuePair<Direction, TerrainCell> nPair in cellsToKeep)
         {
             TerrainCell nCell = nPair.Value;
-            
+
+            // Skip neighbor cell if it already had its drainage calculated and this cell's drainage didn't change
+            if (!redoDrainageForAll && nCell.DrainageDone)
+                continue;
+
             float nCellAltitude = nAltitudes[nCell];
 
             float diff = Mathf.Max(0, cellAltitude - nCellAltitude);
@@ -3655,112 +4060,136 @@ public class World : ISynchronizable
             if (percent == 0)
                 continue;
 
-            float rainfallTransfer = cell.WaterAccumulation * percent;
-            float rainfallTransferMinusLoss = rainfallTransfer - CalculateWaterLoss(nCell, rainfallTransfer);
-
-            if (rainfallTransferMinusLoss <= 0)
-                continue;
-
-            nCell.Buffer += rainfallTransferMinusLoss;
-            nCell.Buffer3 += cell.OriginalTemperature * rainfallTransferMinusLoss;
-            
             float dirFactor = GetDirectionDistanceFactor(nPair.Key);
 
-            if (nCell.Buffer2 < rainfallTransferMinusLoss)
+            float drainageTransfer = cell.WaterAccumulation * percent;
+            float waterLoss = CalculateWaterLoss(nCell, drainageTransfer) * dirFactor;
+            float drainageTransferMinusLoss = drainageTransfer - waterLoss;
+
+            if (drainageTransferMinusLoss <= 0)
+                continue;
+
+            if (nCell.Altitude > nCellAltitude)
             {
-                nCell.Buffer2 = rainfallTransferMinusLoss;
-                nCell.RiverId = cell.RiverId;
-                nCell.RiverLength = cell.RiverLength + dirFactor;
+                nCell.Altitude = nCellAltitude;
             }
 
-            addToCellsToDrain(nCell, true, true);
+            nCell.FeedingCells[cell] = new TerrainCell.RiverBuffers
+            {
+                DrainageTransfer = drainageTransferMinusLoss,
+                TemperatureTransfer = cell.OriginalTemperature * drainageTransferMinusLoss,
+                DirectionFactor = dirFactor
+            };
+
+            addToCellsToDrain(nCell, true, true, false);
         }
     }
 
-    private void ResetDrainage()
+    public IEnumerable<TerrainCell> GetCellsInRectangle(int longitude, int latitude, int width, int height)
     {
-        int sizeX = Width;
-        int sizeY = Height;
+        TerrainCell[] cells = new TerrainCell[width * height];
 
-        for (int i = 0; i < sizeX; i++)
+        for (int i = 0; i < width; i++)
         {
-            for (int j = 0; j < sizeY; j++)
+            for (int j = 0; j < height; j++)
+            {
+                yield return GetCellWithSphericalWrap(longitude + i, latitude + j);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sets the cells on which drainage is to be evaluated.
+    /// </summary>
+    private void SetCellsToEvalForDrainange()
+    {
+        // find cells that are higher than neighbors
+        for (int i = 0; i < Width; i++)
+        {
+            for (int j = 0; j < Height; j++)
             {
                 TerrainCell cell = TerrainCells[i][j];
 
-                if (SkipIfLoaded(cell))
-                    continue;
-
-                ResetDrainage(cell, false);
+                _cellsToDrain.Add(cell);
             }
         }
     }
 
-    private void GenerateDrainageBasins(bool doTerrainModification = true)
+    /// <summary>
+    /// Resets drainage on the set of cells to evaluate.
+    /// </summary>
+    private void ResetDrainage()
+    {
+        // find cells that are higher than neighbors
+        foreach (TerrainCell cell in _cellsToDrain)
+        {
+            ResetDrainage(cell, false);
+        }
+    }
+
+    /// <summary>
+    /// Generates drainage basins within a set of cells.
+    /// </summary>
+    /// <param name="doTerrainModification"> Indicate if additionally the terrain should be modified by drainage action.</param>
+    public void GenerateDrainageBasins(bool doTerrainModification = true)
     {
         // reset drainage before proceeding
         ResetDrainage();
-
-        int sizeX = Width;
-        int sizeY = Height;
 
         MaxWaterAccumulation = 0;
 
         float firstPartLength = 0.1f;
         float secondPartLength = 0.8f;
         float thirdPartLength = 0.1f;
-        
-        HashSet<TerrainCell> queuedDrainCells = new HashSet<TerrainCell>();
-        BinaryHeap<TerrainCell> cellsToDrain = new BinaryHeap<TerrainCell>(TerrainCell.CompareOriginalAltitude, 500000);
 
-        //Debug.Log("Generating Rivers - River Strength: " + RiverStrength);
+        HashSet<TerrainCell> queuedDrainCells = new HashSet<TerrainCell>();
+        BinaryHeap<TerrainCell> cellsToDrain =
+            new BinaryHeap<TerrainCell>(TerrainCell.CompareOriginalAltitude, 500000);
+
+        int i = 0;
+        int evalCount = _cellsToDrain.Count;
+        int segSize = 100;
 
         // find cells that are higher than neighbors
-        for (int i = 0; i < sizeX; i++)
+        foreach (TerrainCell cell in _cellsToDrain)
         {
-            for (int j = 0; j < sizeY; j++)
+            cell.RiverId = cell.Latitude * Width + cell.Longitude;
+
+            if (cell.IsBelowSeaLevel)
+                continue;
+
+            cell.UpdateDrainage();
+
+            if (cell.WaterAccumulation <= 0)
             {
-                TerrainCell cell = TerrainCells[i][j];
-
-                if (SkipIfLoaded(cell))
-                    continue;
-                
-                cell.RiverId = cell.Latitude * Width + cell.Longitude;
-
-                if (cell.Altitude <= 0)
-                    continue;
-                
-                cell.WaterAccumulation = cell.Rainfall;
-                
-                MaxWaterAccumulation = Mathf.Max(MaxWaterAccumulation, cell.WaterAccumulation);
-
-                if (cell.WaterAccumulation <= 0)
-                    continue;
-                
-                float cellAltitude = cell.Altitude + cell.WaterAccumulation * RainfallToHeightConversionFactor;
-
-                bool higherThanNeighbors = true;
-                foreach (TerrainCell nCell in cell.Neighbors.Values)
-                {
-                    float nCellAltitude = nCell.Altitude + nCell.WaterAccumulation * RainfallToHeightConversionFactor;
-                    if ((nCellAltitude > cellAltitude) && (nCell.WaterAccumulation > MinRiverFlow))
-                    {
-                        higherThanNeighbors = false;
-                        break;
-                    }
-                }
-
-                if (!higherThanNeighbors)
-                    continue;
-                
-                cellsToDrain.Insert(cell);
-                queuedDrainCells.Add(cell);
+                cell.DrainageDone = true;
+                continue;
             }
 
-            ProgressCastMethod(_accumulatedProgress + _progressIncrement * firstPartLength * (i + 1) / sizeX);
-        }
+            bool higherThanNeighborsWithWater = true;
+            foreach (TerrainCell nCell in cell.NeighborList)
+            {
+                if ((nCell.Altitude > cell.Altitude) && (nCell.WaterAccumulation > MinRiverFlow))
+                {
+                    higherThanNeighborsWithWater = false;
+                    break;
+                }
+            }
 
-        //Debug.Log("Generating Rivers - Cells to drain: " + cellsToDrain.Count);
+            if (!higherThanNeighborsWithWater)
+            {
+                cell.DrainageDone = true;
+                continue;
+            }
+
+            cellsToDrain.Insert(cell);
+            queuedDrainCells.Add(cell);
+
+            if ((i++ % segSize) == 0)
+            {
+                ProgressCastMethod(_accumulatedProgress + _progressIncrement * firstPartLength * i / evalCount);
+            }
+        }
 
         int cellsDrained = 0;
 
@@ -3768,26 +4197,28 @@ public class World : ISynchronizable
         int drainedCells = 0;
         while (cellsToDrain.Count > 0)
         {
-            TerrainCell cell = cellsToDrain.Extract(false);
-            //queuedDrainCells.Remove(cell);
+            TerrainCell cell = cellsToDrain.Extract();
+            queuedDrainCells.Remove(cell);
 
             cellsDrained++;
 
-            UpdateWater(cell);
+            cell.UpdateDrainage();
 
             drainedCells++;
 
-            if ((drainedCells % sizeY) == 0)
+            if ((drainedCells % Height) == 0)
             {
                 float progressPercent = drainedCells / (float)(drainedCells + cellsToDrain.Count);
 
                 ProgressCastMethod(_accumulatedProgress + _progressIncrement * secondPartLength * progressPercent);
             }
 
-            DrainToNeighbors(cell, (nCell, rD, rA) =>
+            DrainToNeighbors(cell, (nCell, rD, rA, cB) =>
             {
                 if (queuedDrainCells.Contains(nCell))
                     return false;
+
+                nCell.DrainageDone = false;
 
                 cellsToDrain.Insert(nCell);
                 queuedDrainCells.Add(nCell);
@@ -3796,19 +4227,17 @@ public class World : ISynchronizable
             });
         }
 
-        //Debug.Log("Generating Rivers - Total cells drained: " + cellsDrained);
-
         if (doTerrainModification && (MaxWaterAccumulation > 0))
         {
-            // set cells to erode
-            for (int i = 0; i < sizeX; i++)
+            i = 0;
+            foreach (TerrainCell cell in _cellsToDrain)
             {
-                for (int j = 0; j < sizeY; j++)
-                {
-                    DrainModifyCell(TerrainCells[i][j]);
-                }
+                DrainModifyCell(cell);
 
-                ProgressCastMethod(_accumulatedProgress + _progressIncrement * thirdPartLength * (i + 1) / sizeX);
+                if ((i++ % segSize) == 0)
+                {
+                    ProgressCastMethod(_accumulatedProgress + _progressIncrement * thirdPartLength * i / evalCount);
+                }
             }
         }
 
@@ -3820,52 +4249,19 @@ public class World : ISynchronizable
         if (rainfallTransfer <= 0)
             return 0;
 
-        if (cell.Altitude <= 0)
+        if (cell.IsBelowSeaLevel)
         {
             return Mathf.Max(rainfallTransfer * OceanDispersalFactor, MinOceanDispersal);
         }
         else
         {
-            float baseRiverStrength = 0.65f;
-            float bottomLossFactor = 0.25f;
-            float topLossFactor = 0.4f;
+            float maxTransferProtected = 1500f;
 
-            float adjRainTransfer = rainfallTransfer;
-            float baseWaterLoss = 0;
+            float protectedTransfer = Mathf.Min(maxTransferProtected * RiverStrength, rainfallTransfer);
+            float unprotectedTransfer = Mathf.Max(0, rainfallTransfer - protectedTransfer) * RiverStrength;
+            float preservedTransfer = protectedTransfer + unprotectedTransfer;
 
-            if (RiverStrength < baseRiverStrength)
-            {
-                adjRainTransfer *= RiverStrength / baseRiverStrength;
-                baseWaterLoss = rainfallTransfer - adjRainTransfer;
-            }
-            else
-            {
-                float riverStrengthFactor = 1 - (RiverStrength - baseRiverStrength) * 2;
-                bottomLossFactor *= riverStrengthFactor;
-                topLossFactor *= riverStrengthFactor;
-            }
-
-            float bottomMinRiverFlow = 500.0f;
-            float topMinRiverFlow = 2000.0f;
-            float bottomMaxRiverLoss = 400.0f;
-            float topMaxRiverLoss = 18000.0f;
-            float minTemp = 0.0f;
-            float maxTemp = 40.0f;
-            float maxRain = 5000.0f;
-            float maxAlt = 5000.0f;
-
-            float tempFactor = Mathf.Clamp01((cell.Temperature - minTemp) / (maxTemp - minTemp));
-            float lossFactor = (1 - tempFactor) * (topLossFactor - bottomLossFactor) + bottomLossFactor;
-
-            float rainFactor = Mathf.Clamp01(cell.Rainfall / maxRain);
-            float rainTempFactor = Mathf.Min(1 - rainFactor, tempFactor);
-            float minRiverFlow = rainTempFactor * (topMinRiverFlow - bottomMinRiverFlow) + bottomMinRiverFlow;
-            float transferMinusMinLevel = Mathf.Max(0, adjRainTransfer - minRiverFlow);
-
-            float altFactor = Mathf.Clamp01(cell.Altitude / maxAlt);
-            float maxRiverLoss = altFactor * (topMaxRiverLoss - bottomMaxRiverLoss) + bottomMaxRiverLoss;
-
-            return baseWaterLoss + Mathf.Min(transferMinusMinLevel * lossFactor, maxRiverLoss);
+            return rainfallTransfer - preservedTransfer;
         }
     }
 
@@ -3881,20 +4277,6 @@ public class World : ISynchronizable
             float waterAccFactor = cell.WaterAccumulation / (cell.WaterAccumulation + rainfallScalingFactor);
 
             cell.Altitude -= WaterErosionFactor * waterAccFactor * rainfallFactor;
-
-            // 'drag' temperature
-            
-            float tempAcc = cell.Buffer3 + ((cell.OriginalAltitude > 0) ? (cell.OriginalTemperature * cell.Rainfall) : 0);
-            float newTemp = Mathf.Lerp(cell.OriginalTemperature, tempAcc / cell.WaterAccumulation, TemperatureHoldOffFactor);
-
-#if DEBUG
-            if (!newTemp.IsInsideRange(MinPossibleTemperatureWithOffset - 0.5f, MaxPossibleTemperatureWithOffset + 0.5f))
-            {
-                Debug.Log("Invalid newTemp: " + newTemp);
-            }
-#endif
-
-            cell.Temperature = Mathf.Clamp(newTemp, MinPossibleTemperatureWithOffset, MaxPossibleTemperatureWithOffset);
         }
     }
 
@@ -3914,21 +4296,16 @@ public class World : ISynchronizable
 
         float temperature = CalculateTemperature(value + cell.BaseTemperatureOffset);
 
-#if DEBUG
         if (!temperature.IsInsideRange(MinPossibleTemperatureWithOffset - 0.5f, MaxPossibleTemperatureWithOffset + 0.5f))
         {
-            Debug.Log("Invalid temperature: " + temperature);
+            Debug.LogWarning("CalculateAndSetTemperature - Invalid temperature: " + temperature);
         }
-#endif
 
         cell.Temperature = temperature;
         cell.OriginalTemperature = temperature;
         cell.BaseTemperatureValue = value;
-        
-        if (modified)
-        {
-            cell.Modified = true;
-        }
+
+        cell.Modified |= modified;
 
         if (temperature > MaxTemperature) MaxTemperature = temperature;
         if (temperature < MinTemperature) MinTemperature = temperature;
@@ -3942,12 +4319,10 @@ public class World : ISynchronizable
 
         float temperature = CalculateTemperature(value + offset);
 
-#if DEBUG
         if (!temperature.IsInsideRange(MinPossibleTemperatureWithOffset - 0.5f, MaxPossibleTemperatureWithOffset + 0.5f))
         {
-            Debug.Log("Invalid temperature: " + temperature);
+            Debug.LogWarning("RecalculateAndSetTemperature - Invalid temperature: " + temperature);
         }
-#endif
 
         cell.Temperature = temperature;
         cell.OriginalTemperature = temperature;
@@ -3961,7 +4336,7 @@ public class World : ISynchronizable
         float altitudeDelta = 0;
         float cellAltitude = cell.Altitude;
 
-        foreach (TerrainCell nCell in cell.Neighbors.Values)
+        foreach (TerrainCell nCell in cell.NeighborList)
         {
             altitudeDelta += Mathf.Abs(cellAltitude - nCell.Altitude);
         }
@@ -3977,7 +4352,7 @@ public class World : ISynchronizable
     {
         float radius1 = 2f;
         float radius2 = 16f;
-        
+
         float alpha = cell.Alpha;
         float beta = cell.Beta;
 
@@ -4024,7 +4399,7 @@ public class World : ISynchronizable
     {
         int sizeX = Width;
         int sizeY = Height;
-        
+
         for (int i = 0; i < sizeX; i++)
         {
             for (int j = 0; j < sizeY; j++)
@@ -4050,7 +4425,10 @@ public class World : ISynchronizable
                 TerrainCell cell = TerrainCells[i][j];
 
                 if (SkipIfLoaded(cell))
+                {
+                    CalculateAndSetTemperature(cell, cell.BaseTemperatureValue);
                     continue;
+                }
 
                 GenerateTerrainTemperature(cell);
             }
@@ -4064,7 +4442,7 @@ public class World : ISynchronizable
     private void CalculateTerrainArability(TerrainCell cell)
     {
         float radius = 2f;
-        
+
         float alpha = cell.Alpha;
         float beta = cell.Beta;
 
@@ -4126,14 +4504,14 @@ public class World : ISynchronizable
             offset = data.Offset;
 
         float value = CalculateLayerValue(cell, layer, offset);
-        
+
         cell.SetLayerData(layer, value, offset, data);
     }
 
     private void CalculateAndSetTerrainLayerValue(TerrainCell cell, Layer layer, float offset)
     {
         CellLayerData data = cell.GetLayerData(layer.Id);
-        
+
         if (data != null)
             offset += data.Offset;
 
@@ -4438,13 +4816,13 @@ public class World : ISynchronizable
 
     private float CalculateWaterBiomeWaterFactor(TerrainCell cell, Biome biome)
     {
-        float flowwingWaterSpan = biome.MaxFlowingWater - biome.MinFlowingWater;
+        float flowingWaterSpan = biome.MaxFlowingWater - biome.MinFlowingWater;
         float flowingWaterDiff = cell.FlowingWater - biome.MinFlowingWater;
 
         if (flowingWaterDiff < 0)
             return -1f;
 
-        float waterFactor = flowingWaterDiff / flowwingWaterSpan;
+        float waterFactor = flowingWaterDiff / flowingWaterSpan;
 
         if (waterFactor > 1)
             return -1f;
@@ -4524,7 +4902,7 @@ public class World : ISynchronizable
     private float CalculateBiomeLayerFactor(TerrainCell cell, Biome.LayerConstraint constraint)
     {
         Layer layer = Layer.Layers[constraint.LayerId];
-        
+
         float cellValue = cell.GetLayerValue(constraint.LayerId) * layer.MaxPossibleValue;
 
         float valueSpan = constraint.MaxValue - constraint.MinValue;

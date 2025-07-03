@@ -255,7 +255,8 @@ public class GuiManagerScript : MonoBehaviour
         PlanetOverlay.PolityAdminCost,
         PlanetOverlay.FactionCoreDistance,
         PlanetOverlay.PolityCluster,
-        PlanetOverlay.ClusterAdminCost
+        PlanetOverlay.ClusterAdminCost,
+        PlanetOverlay.FormationDate
     };
     private int _currentPolityOverlay = 0;
 
@@ -280,7 +281,8 @@ public class GuiManagerScript : MonoBehaviour
         PlanetOverlay.UpdateSpan,
         PlanetOverlay.Migration,
         PlanetOverlay.MigrationPressure,
-        PlanetOverlay.PolityMigrationPressure
+        PlanetOverlay.PolityMigrationPressure,
+        PlanetOverlay.HumanArrival
     };
     private int _currentDebugOverlay = 0;
 
@@ -1085,7 +1087,7 @@ public class GuiManagerScript : MonoBehaviour
 
             if (Manager.CurrentDevMode != DevMode.None)
             {
-                Manager.HandleKeyUp(KeyCode.D, false, false, ActivateDebugOverlay);
+                Manager.HandleKeyUp(KeyCode.E, false, false, ActivateDebugOverlay);
             }
         }
 
@@ -1296,6 +1298,11 @@ public class GuiManagerScript : MonoBehaviour
     public void SetCoastlineView()
     {
         SetView(PlanetView.Coastlines);
+    }
+
+    public void SetDebugView()
+    {
+        SetView(PlanetView.Debug);
     }
 
     private void ReadKeyboardInput()
@@ -1688,6 +1695,19 @@ public class GuiManagerScript : MonoBehaviour
 
         _regenMapTexture = true;
         _regenMapOverlayTexture = true;
+    }
+
+    public void ResetWorld()
+    {
+        ResetGuiManagerState();
+
+        Manager.ResetWorld();
+        
+        MainMenuDialogPanelScript.SetVisible(false);
+
+        _hasToSetInitialPopulation = true;
+
+        OpenModeSelectionDialog();
     }
 
     private void GenerateWorld(bool randomSeed = true, int seed = 0, bool useHeightmap = false)
@@ -3022,6 +3042,10 @@ public class GuiManagerScript : MonoBehaviour
         {
             ChangePlanetOverlay(PlanetOverlay.PolityAdminCost, false);
         }
+        else if (OverlayDialogPanelScript.FormationDateToggle.isOn)
+        {
+            ChangePlanetOverlay(PlanetOverlay.FormationDate, false);
+        }
         else if (OverlayDialogPanelScript.TemperatureToggle.isOn)
         {
             ChangePlanetOverlay(PlanetOverlay.Temperature, false);
@@ -3081,6 +3105,10 @@ public class GuiManagerScript : MonoBehaviour
         else if (OverlayDialogPanelScript.PolityMigrationPressureToggle.isOn)
         {
             ChangePlanetOverlay(PlanetOverlay.PolityMigrationPressure, false);
+        }
+        else if (OverlayDialogPanelScript.HumanArrivalToggle.isOn)
+        {
+            ChangePlanetOverlay(PlanetOverlay.HumanArrival, false);
         }
         else
         {

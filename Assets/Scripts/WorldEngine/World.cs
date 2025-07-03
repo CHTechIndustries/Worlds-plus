@@ -1758,6 +1758,8 @@ public class World : ISynchronizable, IWorldDateGetter
 
     public void AddGroup(CellGroup group)
     {
+        group.DateofHumanArrival = CurrentDate;
+
         _cellGroups.Add(group.Id, group);
 
         Manager.AddUpdatedCell(group.Cell, CellUpdateType.GroupTerritoryClusterAndLanguage, CellUpdateSubType.AllButTerrain);
@@ -1784,6 +1786,11 @@ public class World : ISynchronizable, IWorldDateGetter
         _cellGroups.TryGetValue(id, out CellGroup group);
 
         return group;
+    }
+
+    public List<CellGroup> GetAllGroups()
+    {
+        return new List<CellGroup>(_cellGroups.Values);
     }
 
 #if DEBUG
@@ -3242,6 +3249,86 @@ public class World : ISynchronizable, IWorldDateGetter
 
         Manager.AddUpdatedCell(cell, CellUpdateType.Cell, CellUpdateSubType.Terrain);
         Manager.ActiveEditorBrushAction.AddCellAfterModification(cell);
+    }
+
+    public void ResetWorld(){
+        CurrentDate = 0;
+        int sizeX = Width;
+        int sizeY = Height;
+
+        List<Territory> _territoriesToRemove = new List<Territory>();
+
+        for (int i = 0; i < sizeX; i++)
+        {
+            for (int j = 0; j < sizeY; j++)
+            {
+                if (TerrainCells[i][j].Group!=null)
+                {
+                    AddGroupToRemove(TerrainCells[i][j].Group);
+                }
+
+                Territory EncompassingTerritory = TerrainCells[i][j].EncompassingTerritory;
+
+                if (EncompassingTerritory != null)
+                {
+                    if (!_territoriesToRemove.Contains(EncompassingTerritory))
+                    {
+                        _territoriesToRemove.Add(EncompassingTerritory);
+                    }
+                    EncompassingTerritory.SetCellToRemove(TerrainCells[i][j]);
+                    EncompassingTerritory.RemoveCells();
+                }
+            }
+        }
+
+        foreach (var t in _territoriesToRemove)
+        {
+            t.RemoveCells();
+        }
+
+        RemoveGroups();
+
+        //Regions have to be removed after the territories
+        for (int i = 0; i < sizeX; i++)
+        {
+            for (int j = 0; j < sizeY; j++)
+            {
+                if (TerrainCells[i][j].Region != null)
+                {
+                    TerrainCells[i][j].Region = null;
+                }
+            }
+        }
+        
+        foreach (Polity p in GetActivePolities())
+        {
+            AddPolityToRemove(p);
+        } 
+
+        RemovePolities();
+       
+        //Not sure if all of this is necessary or if theres something missing:
+        _factionsToUpdate.Clear();
+        _factionsToRemove.Clear();
+        _politiesToUpdate.Clear();
+
+        _languages.Clear();
+        LanguageCount = 0;
+        _regionInfos.Clear();
+        RegionCount = 0;
+        _polityInfos.Clear();
+        PolityCount = 0;
+        _factionInfos.Clear();
+        FactionCount = 0;
+
+        MostPopulousGroup = null;
+        
+        CulturalKnowledgeInfoList.Clear();
+        _culturalKnowledgeIdList.Clear();
+        ExistingDiscoveries.Clear();
+        ExistingDiscoveryIds.Clear();
+        _eventMessageIds.Clear();
+        _eventMessagesToShow.Clear();
     }
 
     private void GenerateTerrainAltitude()
@@ -5003,4 +5090,6 @@ public class World : ISynchronizable, IWorldDateGetter
 
         return temperature;
     }
+
+
 }

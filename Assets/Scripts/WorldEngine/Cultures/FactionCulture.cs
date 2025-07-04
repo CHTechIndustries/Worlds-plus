@@ -1,9 +1,4 @@
-using UnityEngine;
-using System.Collections;
 using System.Collections.Generic;
-using System.Xml;
-using System.Xml.Serialization;
-using UnityEngine.Profiling;
 
 /// <summary>
 /// An abstraction of a faction's culture
@@ -12,7 +7,6 @@ public class FactionCulture : Culture
 {
     public const long OptimalTimeSpan = CellGroup.GenerationSpan * 500;
 
-    [XmlIgnore]
     public Faction Faction;
 
     /// <summary>

@@ -28,7 +28,8 @@ public enum PlanetView
 {
     Elevation = 0,
     Biomes = 1,
-    Coastlines = 2
+    Coastlines = 2,
+    Debug = 3
 }
 
 public enum PlanetOverlay
@@ -73,7 +74,9 @@ public enum PlanetOverlay
     UpdateSpan,
     Migration,
     PolityCluster,
-    ClusterAdminCost
+    ClusterAdminCost,
+    FormationDate,
+    HumanArrival
 }
 
 public enum OverlayColorId
@@ -1315,6 +1318,22 @@ public class Manager
         UpdatedCells.UnionWith(cells);
     }
 
+    public static bool CanAddPopulationGroupAtPosition(int longitude, int latitude)
+    {
+        if ((longitude < 0) || (longitude >= CurrentWorld.Width))
+            return false;
+
+        if ((latitude < 0) || (latitude >= CurrentWorld.Height))
+            return false;
+
+        TerrainCell cell = CurrentWorld.GetCell(longitude, latitude);
+
+        if (cell.IsLiquidSea || cell.Survivability < World.MinSurvivabilityForUserGroupPlacement)
+            return false;
+
+        return true;
+    }
+
     public static void GenerateRandomHumanGroup(int initialPopulation)
     {
         World world = _manager._currentWorld;
@@ -1438,6 +1457,11 @@ public class Manager
             PerformingAsyncTask = false;
             SimulationRunning = true;
         });
+    }
+
+    public static void ResetWorld()
+    {
+        CurrentWorld.ResetWorld();
     }
 
     public static void RegenerateWorld(GenerationType type)
@@ -3248,6 +3272,10 @@ public class Manager
                 color = GenerateCoastlineColor(cell);
                 break;
 
+            case PlanetView.Debug:
+                color = GenerateDebugColor(cell);
+                break;
+
             default:
                 throw new System.Exception("Unsupported Planet View Type");
         }
@@ -3366,6 +3394,10 @@ public class Manager
                 color = SetPolitySelectionOverlayColor(cell, color);
                 break;
 
+            case PlanetOverlay.FormationDate:
+                color = SetFormationDateOverlayColor(cell, color);
+                break;
+
             case PlanetOverlay.Temperature:
                 color = SetTemperatureOverlayColor(cell, color);
                 break;
@@ -3440,6 +3472,10 @@ public class Manager
 
             case PlanetOverlay.Migration:
                 color = SetMigrationOverlayColor(cell, color);
+                break;
+
+            case PlanetOverlay.HumanArrival:
+                color = SetDateofArrivalOverlayColor(cell, color);
                 break;
 
             default:
@@ -3635,6 +3671,20 @@ public class Manager
         }
 
         return color * slantFactor * altitudeFactor;
+    }
+
+    private static Color GenerateDebugColor(TerrainCell cell)
+    {
+        Color color = Color.white;
+
+        if(cell.IsBelowSeaLevel)
+        {
+            color.r = 0.419f;
+            color.g = 0.36f;
+            color.b = 0.647f;
+        }
+        
+        return color;
     }
 
     private static bool IsRegionBorder(Region region, TerrainCell cell)
@@ -4105,6 +4155,20 @@ public class Manager
 
                 color = (color * (1 - totalProminenceValueFactor)) + (mixedPolityColor * totalProminenceValueFactor);
             }
+        }
+
+        return color;
+    }
+
+    private static Color SetFormationDateOverlayColor(TerrainCell cell, Color color)
+    {
+        if(cell.EncompassingTerritory != null)
+        {
+            Polity territoryPolity = cell.EncompassingTerritory.Polity;
+
+            float value = (float)territoryPolity.FormationDate / CurrentWorld.CurrentDate;
+
+            color = new Color(value, value/2f, 1f-value);
         }
 
         return color;
@@ -4939,7 +5003,9 @@ public class Manager
 
                     float knowledgeFactor = Mathf.Clamp01((knowledgeValue - startValue) / (minValue - startValue));
 
-                    cellColor = (cellColor * knowledgeFactor) + densityColorSubOptimal * (1f - knowledgeFactor);
+                    //Experimenting
+                    cellColor = knowledgeValue<3?densityColorSubOptimal:cellColor;
+                    //cellColor = (cellColor * knowledgeFactor) + densityColorSubOptimal * (1f - knowledgeFactor);
                 }
                 else
                 {
@@ -5020,6 +5086,19 @@ public class Manager
         else if (cell.Group != null)
         {
             color = GetUnincorporatedGroupColor();
+        }
+
+        return color;
+    }
+
+    private static Color SetDateofArrivalOverlayColor(TerrainCell cell, Color color)
+    {
+
+        if(cell.Group != null)
+        {
+            float value = (float)cell.Group.DateofHumanArrival / CurrentWorld.CurrentDate;
+
+            color = new Color(value, value/2f, 1f-value);
         }
 
         return color;

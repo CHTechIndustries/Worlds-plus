@@ -1,0 +1,4 @@
+this branch is for transferring all the community health files;
+
+that means transferring and minor format changes to the readme, liscense, and funding;
+adding in templates, contribution guidelines, and more

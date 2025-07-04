@@ -5,18 +5,16 @@ using System.Text.RegularExpressions;
 
 public class AssignableCulturalPreferencesEntity : CulturalPreferencesEntity
 {
-    public AssignableCulturalPreferencesEntity(Context c, string id) : base(c, id)
+    public AssignableCulturalPreferencesEntity(Context c, string id, IEntity parent) : base(c, id, parent)
     {
     }
 
     public AssignableCulturalPreferencesEntity(
-        ValueGetterMethod<Culture> getterMethod, Context c, string id)
-        : base(getterMethod, c, id)
+        ValueGetterMethod<Culture> getterMethod, Context c, string id, IEntity parent)
+        : base(getterMethod, c, id, parent)
     {
     }
 
-    protected override EntityAttribute CreatePreferenceAttribute(string attributeId)
-    {
-        return new AssignablePreferenceAttribute(this, attributeId);
-    }
+    protected override EntityAttribute CreateEntryAttribute(string attributeId) => 
+        new AssignablePreferenceAttribute(this, attributeId);
 }

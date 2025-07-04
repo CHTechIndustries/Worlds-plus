@@ -9,6 +9,8 @@ public class PolityProminenceCluster : Identifiable, ISynchronizable
     public const int MaxSize = 50;
     public const int MinSplitSize = 25;
 
+    public const float MaxAdminCost = Polity.MaxAdminCost;
+
     [XmlAttribute("TAC")]
     public float TotalAdministrativeCost = 0;
 
@@ -20,6 +22,17 @@ public class PolityProminenceCluster : Identifiable, ISynchronizable
 
     [XmlAttribute("NC")]
     public bool NeedsNewCensus = true;
+
+    #region RegionId
+    [XmlAttribute("RId")]
+    public string RegionIdStr
+    {
+        get { return RegionId; }
+        set { RegionId = value; }
+    }
+    [XmlIgnore]
+    public Identifier RegionId;
+    #endregion
 
     public List<Identifier> ProminenceIds = null;
 
@@ -64,10 +77,8 @@ public class PolityProminenceCluster : Identifiable, ISynchronizable
 
         foreach (PolityProminence prominence in _prominences.Values)
         {
-            if (prominence.AdministrativeCost < float.MaxValue)
-                TotalAdministrativeCost += prominence.AdministrativeCost;
-            else
-                TotalAdministrativeCost = float.MaxValue;
+            TotalAdministrativeCost = 
+                Mathf.Min(prominence.AdministrativeCost + prominence.AdministrativeCost, MaxAdminCost);
 
             float polityPop = prominence.Group.Population * prominence.Value;
 
@@ -91,6 +102,7 @@ public class PolityProminenceCluster : Identifiable, ISynchronizable
         if (Region == null)
         {
             Region = prominence.Group.Cell.Region;
+            RegionId = Region.Id;
         }
 
         _prominences.Add(prominence.Id, prominence);
@@ -285,16 +297,22 @@ public class PolityProminenceCluster : Identifiable, ISynchronizable
 
         if (group == null)
         {
-            string message = "Missing Group with Id " + id + " in PolityProminenceCluster of Polity with Id " + Polity.Id;
-            throw new System.Exception(message);
+            throw new System.Exception(
+                $"Missing Group {id} in PolityProminenceCluster of Polity {Polity.Id}");
         }
 
         PolityProminence prominence = group.GetPolityProminence(Polity);
 
         if (prominence == null)
         {
-            string message = "Missing polity prominence with Id " + id + " in PolityProminenceCluster of Polity with Id " + Polity.Id;
-            throw new System.Exception(message);
+            throw new System.Exception(
+                $"Missing polity prominence {id} in PolityProminenceCluster of Polity {Polity.Id}");
+        }
+
+        if (prominence.ClosestFactionId == null)
+        {
+            throw new System.Exception(
+                $"Missing ClosestFactionId for polity prominence {id} in PolityProminenceCluster of Polity {Polity.Id}");
         }
 
         return prominence;
@@ -312,22 +330,27 @@ public class PolityProminenceCluster : Identifiable, ISynchronizable
     {
         LoadProminences();
 
-        foreach (KeyValuePair<Identifier, PolityProminence> pair in _prominences)
+        foreach (var pair in _prominences)
         {
-            if (Region == null)
-            {
-                Region = pair.Value.Group.Cell.Region;
-            }
+            var p = pair.Value;
 
-            PolityProminence p = pair.Value;
-
-            World world = Polity.World;
-
-            p.Group = world.GetGroup(pair.Key);
+            p.World = Polity.World;
+            p.Group = Polity.World.GetGroup(pair.Key);
             p.Polity = Polity;
-            p.ClosestFaction = Polity.GetFaction(p.ClosestFactionId);
+
+            p.SetClosestFaction(Polity.GetFaction(p.ClosestFactionId));
+
             p.Cluster = this;
+
+            if (p.ClosestFaction == null)
+            {
+                throw new System.Exception("Unable to find faction with id: " +
+                    p.ClosestFactionId + " in polity " + p.PolityId + ", group: " +
+                    p.Id);
+            }
         }
+
+        Region = Polity.World.GetRegionInfo(RegionId).Region;
     }
 
     public void Synchronize()

@@ -5,7 +5,7 @@ using System.Linq;
 
 [XmlInclude(typeof(CellRegion))]
 [XmlInclude(typeof(SuperRegion))]
-public abstract class Region : ISynchronizable, ICellCollectionGetter
+public abstract class Region : ISynchronizable, ICellSet
 {
     public enum FilterType
     {
@@ -24,7 +24,7 @@ public abstract class Region : ISynchronizable, ICellCollectionGetter
     public bool IsHovered = false;
 
     [XmlIgnore]
-    public FilterType AssignedFilterType = FilterType.None;
+    public FilterType SelectionFilterType = FilterType.None;
 
     [XmlIgnore]
     public Region Parent = null;
@@ -92,6 +92,9 @@ public abstract class Region : ISynchronizable, ICellCollectionGetter
     [XmlIgnore]
     public World World => Info.World;
 
+    [XmlIgnore]
+    public int Rank => Info.Rank;
+
     protected Dictionary<string, float> _biomePresences;
 
     protected event System.Action<Region> UpdateEvent;
@@ -101,9 +104,9 @@ public abstract class Region : ISynchronizable, ICellCollectionGetter
 
     }
 
-    public Region(TerrainCell originCell, long idOffset, Language language)
+    public Region(TerrainCell originCell, int rank, Language language)
     {
-        Info = new RegionInfo(this, originCell, idOffset, language);
+        Info = new RegionInfo(this, originCell, rank, language);
     }
 
     public static void SetAsNeighbors(Region r1, Region r2)
@@ -185,4 +188,6 @@ public abstract class Region : ISynchronizable, ICellCollectionGetter
     }
 
     public abstract TerrainCell GetMostCenteredCell();
+
+    public abstract RectInt GetBoundingRectangle();
 }

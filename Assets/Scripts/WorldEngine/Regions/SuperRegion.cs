@@ -5,11 +5,15 @@ using System.Linq;
 
 public class SuperRegion : Region
 {
-    public List<RegionInfo> SubRegionInfos = new List<RegionInfo>();
+    public List<Identifier> SubRegionIds;
+
+    private HashSet<Region> _subRegions = new HashSet<Region>();
 
     private HashSet<TerrainCell> _cells = null;
 
     private TerrainCell _mostCenteredCell = null;
+
+    private RectInt _rect;
 
     public SuperRegion()
     {
@@ -17,13 +21,29 @@ public class SuperRegion : Region
     }
 
     public SuperRegion(TerrainCell originCell, Region startSubRegion, Language language)
+        : base(originCell, startSubRegion.Rank + 1, language)
     {
-        Info = new RegionInfo(this, originCell, startSubRegion.GetHashCode(), language);
+    }
+
+    private void UpdateRectangle(Region subRegion, bool first)
+    {
+        RectInt subRect = subRegion.GetBoundingRectangle();
+
+        if (first)
+        {
+            _rect = new RectInt(subRect.position, subRect.size);
+        }
+        else
+        {
+            _rect.Extend(subRect, World.Width);
+        }
     }
 
     public void Add(Region subRegion)
     {
-        SubRegionInfos.Add(subRegion.Info);
+        UpdateRectangle(subRegion, _subRegions.Count == 0);
+
+        _subRegions.Add(subRegion);
 
         _cells = null;
         _mostCenteredCell = null;
@@ -36,9 +56,9 @@ public class SuperRegion : Region
 
         _cells = new HashSet<TerrainCell>();
 
-        foreach (RegionInfo info in SubRegionInfos)
+        foreach (Region region in _subRegions)
         {
-            _cells.UnionWith(info.Region.GetCells());
+            _cells.UnionWith(region.GetCells());
         }
     }
 
@@ -86,16 +106,25 @@ public class SuperRegion : Region
 
     public override void Synchronize()
     {
+        SubRegionIds = new List<Identifier>(_subRegions.Count);
+
+        foreach (Region region in _subRegions)
+        {
+            SubRegionIds.Add(region.Id);
+        }
     }
 
     public override void FinalizeLoad()
     {
-        foreach (RegionInfo info in SubRegionInfos)
+        foreach (Identifier id in SubRegionIds)
         {
-            info.World = World;
-            info.Region.Parent = this;
+            RegionInfo info = World.GetRegionInfo(id);
 
-            info.FinalizeLoad();
+            UpdateRectangle(info.Region, _subRegions.Count == 0);
+
+            _subRegions.Add(info.Region);
+
+            info.Region.Parent = this;
         }
     }
 
@@ -147,5 +176,10 @@ public class SuperRegion : Region
         RefreshMostCenteredCell();
 
         return _mostCenteredCell;
+    }
+
+    public override RectInt GetBoundingRectangle()
+    {
+        return _rect;
     }
 }

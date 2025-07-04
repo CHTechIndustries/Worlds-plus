@@ -7,11 +7,27 @@ using UnityEngine.Profiling;
 using System;
 
 [XmlInclude(typeof(Clan))]
-public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
+public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder, ICellSet
 {
+    public enum FilterType
+    {
+        None,
+        Related,
+        Selectable
+    }
+
+    private HashSet<IFactionEventGenerator> _generatorsToTestAssignmentFor =
+        new HashSet<IFactionEventGenerator>();
+
     public static List<IWorldEventGenerator> OnSpawnEventGenerators;
     public static List<IWorldEventGenerator> OnStatusChangeEventGenerators;
     public static List<IWorldEventGenerator> OnGuideSwitchEventGenerators;
+    public static List<IWorldEventGenerator> OnCoreGroupProminenceValueFallsBelowEventGenerators;
+    public static Dictionary<string, List<IWorldEventGenerator>> OnKnowledgeLevelFallsBelowEventGenerators;
+    public static Dictionary<string, List<IWorldEventGenerator>> OnKnowledgeLevelRaisesAboveEventGenerators;
+    public static Dictionary<string, List<IWorldEventGenerator>> OnGainedDiscoveryEventGenerators;
+
+    public static HashSet<FactionEventGenerator> EventGeneratorsThatNeedCleanup;
 
     [XmlAttribute("Inf")]
     public float InfluenceInternal;
@@ -79,6 +95,12 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
     [XmlIgnore]
     public bool HasBeenUpdated = false;
 
+    [XmlIgnore]
+    public FilterType SelectionFilterType = FilterType.None;
+
+    [XmlIgnore]
+    public bool IsHovered = false;
+
     public List<string> Flags;
 
     public FactionCulture Culture;
@@ -103,9 +125,6 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
     public CellGroup CoreGroup;
 
     [XmlIgnore]
-    public CellGroup NewCoreGroup = null;
-
-    [XmlIgnore]
     public bool IsInitialized = false;
 
     [XmlIgnore]
@@ -114,6 +133,9 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
     // Use this instead to get the leader
     [XmlIgnore]
     public Agent CurrentLeader => _currentLeader.Value;
+
+    [XmlIgnore]
+    public List<CellGroup> Groups => GetGroups();
 
     [XmlIgnore]
     public bool BeingRemoved = false;
@@ -133,6 +155,15 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
     [XmlIgnore]
     public long CurrentDate => World.CurrentDate;
 
+    [XmlIgnore]
+    public HashSet<PolityProminence> Prominences = new HashSet<PolityProminence>();
+
+    [XmlIgnore]
+    public Dictionary<Faction, int> NeighborFactions = new Dictionary<Faction, int>();
+
+    [XmlIgnore]
+    public Dictionary<Polity, int> NeighborPolities = new Dictionary<Polity, int>();
+
     protected Dictionary<Identifier, FactionRelationship> _relationships =
         new Dictionary<Identifier, FactionRelationship>();
 
@@ -142,7 +173,7 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
     private DatedValue<float> _administrativeLoad;
     private DatedValue<Agent> _currentLeader;
 
-    private HashSet<string> _flags = new HashSet<string>();
+    private readonly HashSet<string> _flags = new HashSet<string>();
 
     private bool _preupdated = false;
 
@@ -189,25 +220,23 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
         if (parentFaction != null)
         {
             PolityProminence polityProminence = CoreGroup.GetPolityProminence(PolityId);
-            World.AddPromToCalculateCoreDistFor(polityProminence);
+            World.AddPromToSetCoreDistFor(polityProminence);
         }
+    }
+
+    private void InitDatedValues()
+    {
+        _administrativeLoad = new DatedValue<float>(World, CalculateAdministrativeLoad);
+        _currentLeader = new DatedValue<Agent>(World, RequestCurrentLeader);
     }
 
     public void Initialize()
     {
-        _administrativeLoad = new DatedValue<float>(World, CalculateAdministrativeLoad);
-        _currentLeader = new DatedValue<Agent>(World, RequestCurrentLeader);
-
-        InitializeInternal();
+        InitDatedValues();
 
         InitializeDefaultEvents();
 
         IsInitialized = true;
-    }
-
-    protected virtual void InitializeInternal()
-    {
-
     }
 
     protected abstract float CalculateAdministrativeLoad();
@@ -259,6 +288,13 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
         if (!polityBeingDestroyed)
         {
             Polity.RemoveFaction(this);
+
+            World.AddPolityToUpdate(Polity);
+
+            if (IsDominant)
+            {
+                Polity.CoreGroupIsValid = false;
+            }
         }
 
         List<FactionRelationship> relationshipsToRemove =
@@ -268,9 +304,30 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
             relationship.Faction.RemoveRelationship(this);
         }
 
+        foreach (var generator in EventGeneratorsThatNeedCleanup)
+        {
+            generator.RemoveReferences(this);
+        }
+
         Info.Faction = null;
 
         StillPresent = false;
+    }
+
+    public void AddProminence(PolityProminence prominence)
+    {
+        if (!Prominences.Add(prominence))
+            return;
+
+        SetNeighborFactionsFromProminence(prominence);
+    }
+
+    public void RemoveProminence(PolityProminence prominence)
+    {
+        if (!Prominences.Remove(prominence))
+            return;
+
+        UnsetNeighborFactionsFromProminence(prominence);
     }
 
     /// <summary>
@@ -278,28 +335,27 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
     /// </summary>
     public void SetToRemove()
     {
-        PolityProminence prominence = CoreGroup.GetPolityProminence(PolityId);
-        prominence.ResetCoreDistances();
+        CoreGroup.ResetCoreDistances(PolityId, true);
 
         World.AddFactionToRemove(this);
 
         BeingRemoved = true;
     }
 
-    public void SetToUpdate()
+    public void SetToUpdate(bool warnIfUnexpected = true)
     {
-        World.AddGroupToUpdate(CoreGroup);
-        World.AddFactionToUpdate(this);
-        World.AddPolityToUpdate(Polity);
+        World.AddGroupToUpdate(CoreGroup, warnIfUnexpected);
+        World.AddFactionToUpdate(this, warnIfUnexpected);
+        World.AddPolityToUpdate(Polity, warnIfUnexpected);
     }
 
-    public static void SetRelationship(Faction factionA, Faction factionB, float value)
+    public static void SetRelationship(Faction factionA, Faction factionB, float value = 0.5f, bool needFactionsToUpdate = true)
     {
-        factionA.SetRelationship(factionB, value);
-        factionB.SetRelationship(factionA, value);
+        factionA.SetRelationship(factionB, value, needFactionsToUpdate);
+        factionB.SetRelationship(factionA, value, needFactionsToUpdate);
     }
 
-    public void SetRelationship(Faction faction, float value)
+    public void SetRelationship(Faction faction, float value = 0.5f, bool needFactionToUpdate = true)
     {
         value = Mathf.Clamp01(value);
 
@@ -314,6 +370,11 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
         else
         {
             _relationships[faction.Id].Value = value;
+        }
+
+        if (needFactionToUpdate)
+        {
+            SetToUpdate();
         }
     }
 
@@ -330,10 +391,15 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
 
     public float GetRelationshipValue(Faction faction)
     {
+        if (faction == null)
+        {
+            throw new ArgumentNullException("faction is null");
+        }
+
         // Set a default neutral relationship
         if (!_relationships.ContainsKey(faction.Id))
         {
-            Faction.SetRelationship(this, faction, 0.5f);
+            SetRelationship(this, faction, 0.5f, needFactionsToUpdate: false);
         }
 
         return _relationships[faction.Id].Value;
@@ -425,20 +491,20 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
         float initialRelationshipValue)
     {
 //#if DEBUG
-//        Manager.DebugPauseSimRequested = true;
+//        Manager.Debug_PauseSimRequested = true;
 //#endif
 
         Influence -= influenceToTransfer;
 
         if (newFactionCoreGroup == null)
         {
-            throw new Exception("newFactionCoreGroup is null - Faction Id: " + Id);
+            throw new Exception($"newFactionCoreGroup is null - Faction Id: {Id}");
         }
 
         if (newFactionCoreGroup.FactionCores.Count > 0)
         {
             throw new Exception(
-                "newFactionCoreGroup has cores already - Group: " + newFactionCoreGroup.Id + ", Faction: " + Id);
+                $"newFactionCoreGroup has cores already - Group: {newFactionCoreGroup.Id}, Faction: {Id}");
         }
 
         float polityProminenceValue = newFactionCoreGroup.GetPolityProminenceValue(Polity);
@@ -447,20 +513,20 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
         if (highestPolityProminence == null)
         {
             throw new Exception(
-                "highestPolityProminence is null - Faction Id: " + Id +
-                ", Group Id: " + newFactionCoreGroup);
+                $"highestPolityProminence is null - Faction Id: {Id}" +
+                $", Group Id: {newFactionCoreGroup}");
         }
 
         if (CurrentLeader == null)
         {
-            throw new Exception("CurrentLeader is null - Faction Id: " + Id);
+            throw new Exception($"CurrentLeader is null - Faction Id: {Id}");
         }
 
         Polity newPolity = Polity;
 
         if (newPolity == null)
         {
-            throw new Exception("newPolity is null - Faction Id: " + Id);
+            throw new Exception($"newPolity is null - Faction Id: {Id}");
         }
 
         // If the polity with the highest prominence is different than the source faction's polity and it's value is twice greater switch the new clan's polity to this one.
@@ -475,7 +541,7 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
 
         if (newFaction == null)
         {
-            throw new Exception("newFaction is null - Faction Id: " + Id);
+            throw new Exception($"newFaction is null - Faction Id: {Id}");
         }
 
 #if DEBUG
@@ -483,7 +549,7 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
 
         if (existingFaction != null)
         {
-            throw new Exception("faction Id already exists - new faction Id: " + newFaction.Id);
+            throw new Exception($"faction Id already exists - new faction Id: {newFaction.Id}");
         }
 #endif
 
@@ -561,11 +627,19 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
 
         PreUpdate();
 
-        UpdateInternal();
-
         LastUpdateDate = World.CurrentDate;
 
         World.AddPolityToUpdate(Polity);
+    }
+
+    public void TryAssignEvents()
+    {
+        foreach (var generator in _generatorsToTestAssignmentFor)
+        {
+            generator.TryGenerateEventAndAssign(this);
+        }
+
+        _generatorsToTestAssignmentFor.Clear();
     }
 
     /// <summary>
@@ -577,28 +651,45 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
         HasBeenUpdated = false;
     }
 
-    public void PrepareNewCoreGroup(CellGroup coreGroup)
+    public void MigrateCoreToGroup(CellGroup group)
     {
-        NewCoreGroup = coreGroup;
-    }
+        if (group == CoreGroup)
+            return;
 
-    [System.Obsolete]
-    public void MigrateToNewCoreGroup()
-    {
+        if (group == null)
+            throw new ArgumentNullException("MigrateCoreToGroup: group to se as core can't be null");
+
         CoreGroup.RemoveFactionCore(this);
+        CoreGroup.ResetCoreDistances(PolityId, true);
 
-        CoreGroup = NewCoreGroup;
-        CoreGroupId = NewCoreGroup.Id;
+        CoreGroup = group;
+        CoreGroupId = group.Id;
 
-        CoreGroup.AddFactionCore(this);
+        group.AddFactionCore(this);
+        var prom = group.GetPolityProminence(PolityId);
+        World.AddPromToSetCoreDistFor(prom);
 
         if (IsDominant)
         {
-            Polity.SetCoreGroup(CoreGroup);
+            Polity.SetCoreGroup(group);
         }
     }
 
-    protected abstract void UpdateInternal();
+    public bool HasContactWithFaction(Faction faction)
+    {
+        if (faction == null)
+            throw new ArgumentNullException("HasContactWithFaction: faction can't be null");
+
+        return NeighborFactions.ContainsKey(faction);
+    }
+
+    public bool HasContactWithPolity(Polity polity)
+    {
+        if (polity == null)
+            throw new ArgumentNullException("HasContactWithPolity: polity can't be null");
+
+        return NeighborPolities.ContainsKey(polity);
+    }
 
     public virtual void Synchronize()
     {
@@ -618,6 +709,10 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
 
     public virtual void FinalizeLoad()
     {
+        InitDatedValues();
+
+        IsInitialized = true;
+
         Name.World = World;
         Name.FinalizeLoad();
 
@@ -658,7 +753,7 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
     public void AddEvent(FactionEvent factionEvent)
     {
         if (_events.ContainsKey(factionEvent.TypeId))
-            throw new System.Exception("Event of type " + factionEvent.TypeId + " already present");
+            throw new System.Exception("Faction event of type " + factionEvent.TypeId + " already present");
 
         _events.Add(factionEvent.TypeId, factionEvent);
         World.InsertEventToHappen(factionEvent);
@@ -717,28 +812,41 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
         GenerateGuideSwitchEvents();
     }
 
-    public void ChangePolity(Polity targetPolity, float targetInfluence)
+    private List<CellGroup> GetGroups()
+    {
+        var groups = new List<CellGroup>();
+
+        foreach (var prominence in Prominences)
+        {
+            groups.Add(prominence.Group);
+        }
+
+        return groups;
+    }
+
+    public void ChangePolity(Polity targetPolity, float targetInfluence, bool transferGroups = true)
     {
         if ((targetPolity == null) || (!targetPolity.StillPresent))
             throw new System.Exception("target Polity is null or not Present");
 
         Polity.RemoveFaction(this);
 
+        if (IsDominant)
+        {
+            Polity.CoreGroupIsValid = false;
+            Polity.NormalizeAndUpdateDominantFaction();
+        }
+
+        if (transferGroups)
+        {
+            targetPolity.TransferGroups(Polity, Groups);
+        }
+
         Polity = targetPolity;
         PolityId = Polity.Id;
         Influence = targetInfluence;
 
         targetPolity.AddFaction(this);
-    }
-
-    public virtual bool ShouldMigrateFactionCore(CellGroup sourceGroup, CellGroup targetGroup)
-    {
-        return false;
-    }
-
-    public virtual bool ShouldMigrateFactionCore(CellGroup sourceGroup, TerrainCell targetCell, float targetProminence, int targetPopulation)
-    {
-        return false;
     }
 
     public void IncreasePreferenceValue(string id, float percentage)
@@ -765,23 +873,6 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
         preference.Value = MathUtility.DecreaseByPercent(value, percentage);
     }
 
-    public float GetPreferenceValue(string id)
-    {
-        CulturalPreference preference = Culture.GetPreference(id);
-
-        if (preference != null)
-            return preference.Value;
-
-        return 0;
-    }
-
-    public abstract float GetGroupWeight(CellGroup group);
-
-    public bool GroupCanBeCore(CellGroup group)
-    {
-        return GetGroupWeight(group) > 0;
-    }
-
     public void SetFlag(string flag)
     {
         _flags.Add(flag);
@@ -802,15 +893,31 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
         OnSpawnEventGenerators = new List<IWorldEventGenerator>();
         OnStatusChangeEventGenerators = new List<IWorldEventGenerator>();
         OnGuideSwitchEventGenerators = new List<IWorldEventGenerator>();
+        OnCoreGroupProminenceValueFallsBelowEventGenerators = new List<IWorldEventGenerator>();
+        OnKnowledgeLevelFallsBelowEventGenerators = new Dictionary<string, List<IWorldEventGenerator>>();
+        OnKnowledgeLevelRaisesAboveEventGenerators = new Dictionary<string, List<IWorldEventGenerator>>();
+        OnGainedDiscoveryEventGenerators = new Dictionary<string, List<IWorldEventGenerator>>();
+        EventGeneratorsThatNeedCleanup = new HashSet<FactionEventGenerator>();
+    }
+
+    public void AddGeneratorToTestAssignmentFor(IFactionEventGenerator generator)
+    {
+        _generatorsToTestAssignmentFor.Add(generator);
+        World.AddFactionToAssignEventsTo(this);
     }
 
     private void InitializeOnSpawnEvents()
     {
         foreach (var generator in OnSpawnEventGenerators)
         {
+            if ((generator is Context context) && context.DebugLogEnabled)
+            {
+                Debug.Log($"Faction.InitializeOnSpawnEvents: adding '{context.Id}' to list of events to try to assign");
+            }
+
             if (generator is IFactionEventGenerator fGenerator)
             {
-                fGenerator.TryGenerateEventAndAssign(this);
+                AddGeneratorToTestAssignmentFor(fGenerator);
             }
         }
     }
@@ -830,9 +937,14 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
     {
         foreach (var generator in OnStatusChangeEventGenerators)
         {
+            if ((generator is Context context) && context.DebugLogEnabled)
+            {
+                Debug.Log($"Faction.ApplyStatusChange: adding '{context.Id}' to list of events to try to assign");
+            }
+
             if (generator is IFactionEventGenerator fGenerator)
             {
-                fGenerator.TryGenerateEventAndAssign(this);
+                AddGeneratorToTestAssignmentFor(fGenerator);
             }
         }
 
@@ -849,9 +961,88 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
     {
         foreach (var generator in OnGuideSwitchEventGenerators)
         {
+            if ((generator is Context context) && context.DebugLogEnabled)
+            {
+                Debug.Log($"Faction.GenerateGuideSwitchEvents: adding '{context.Id}' to list of events to try to assign");
+            }
+
             if (generator is IFactionEventGenerator fGenerator)
             {
-                fGenerator.TryGenerateEventAndAssign(this);
+                AddGeneratorToTestAssignmentFor(fGenerator);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tries to generate and apply all events related to gaining a discovery
+    /// </summary>
+    public void GenerateGainedDiscoveryEvents(string discoveryId)
+    {
+        if (!OnGainedDiscoveryEventGenerators.ContainsKey(discoveryId))
+        {
+            return;
+        }
+
+        foreach (var generator in OnGainedDiscoveryEventGenerators[discoveryId])
+        {
+            if (generator is FactionEventGenerator fGenerator)
+            {
+                AddGeneratorToTestAssignmentFor(fGenerator);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tries to generate and apply all events related to core group dropping below target value
+    /// </summary>
+    public void GenerateCoreGroupProminenceValueBelowEvents(float prominenceValue)
+    {
+        foreach (var generator in OnCoreGroupProminenceValueFallsBelowEventGenerators)
+        {
+            if ((generator is FactionEventGenerator fGenerator) &&
+                fGenerator.TestOnCoreGroupProminenceValueFallsBelow(this, prominenceValue))
+            {
+                AddGeneratorToTestAssignmentFor(fGenerator);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tries to generate and apply all events related to knowledges going below a minimun value
+    /// </summary>
+    public void GenerateKnowledgeLevelFallsBelowEvents(string knowledgeId, float value)
+    {
+        if (!OnKnowledgeLevelFallsBelowEventGenerators.ContainsKey(knowledgeId))
+        {
+            return;
+        }
+
+        foreach (var generator in OnKnowledgeLevelFallsBelowEventGenerators[knowledgeId])
+        {
+            if ((generator is FactionEventGenerator fGenerator) &&
+                fGenerator.TestOnKnowledgeLevelFallsBelow(knowledgeId, this, value))
+            {
+                AddGeneratorToTestAssignmentFor(fGenerator);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Tries to generate and apply all events related to knowledges going above a maximum value
+    /// </summary>
+    public void GenerateKnowledgeLevelRaisesAboveEvents(string knowledgeId, float value)
+    {
+        if (!OnKnowledgeLevelRaisesAboveEventGenerators.ContainsKey(knowledgeId))
+        {
+            return;
+        }
+
+        foreach (var generator in OnKnowledgeLevelRaisesAboveEventGenerators[knowledgeId])
+        {
+            if ((generator is FactionEventGenerator fGenerator) &&
+                fGenerator.TestOnKnowledgeLevelRaisesAbove(knowledgeId, this, value))
+            {
+                AddGeneratorToTestAssignmentFor(fGenerator);
             }
         }
     }
@@ -859,5 +1050,127 @@ public abstract class Faction : ISynchronizable, IWorldDateGetter, IFlagHolder
     public void InitializeDefaultEvents()
     {
         InitializeOnSpawnEvents();
+    }
+
+    public ICollection<TerrainCell> GetCells()
+    {
+        var cells = new List<TerrainCell>();
+
+        foreach (var prominence in Prominences)
+        {
+            cells.Add(prominence.Group.Cell);
+        }
+
+        return cells;
+    }
+
+    public RectInt GetBoundingRectangle()
+    {
+        return CellSet.GetBoundingRectangle(GetCells());
+    }
+
+    private void SetNeighborFactionsFromProminence(PolityProminence prominence)
+    {
+        foreach (var p in prominence.NeighborProminences)
+        {
+            SetFactionsAsNeighbors(p.ClosestFaction, this);
+        }
+    }
+
+    private static void SetFactionsAsNeighbors(Faction a, Faction b)
+    {
+        a?.AddNeighborFaction(b);
+        b?.AddNeighborFaction(a);
+    }
+
+    public void AddNeighborFaction(Faction faction)
+    {
+        if ((faction == null) || (faction == this))
+        {
+            return;
+        }
+
+        if (NeighborFactions.ContainsKey(faction))
+        {
+            NeighborFactions[faction]++;
+        }
+        else
+        {
+            NeighborFactions[faction] = 1;
+
+            if (!HasRelationship(faction))
+            {
+                SetRelationship(faction, needFactionToUpdate: false);
+            }
+        }
+
+        var polity = faction.Polity;
+
+        if (polity == Polity)
+        {
+            return;
+        }
+
+        if (NeighborPolities.ContainsKey(polity))
+        {
+            NeighborPolities[polity]++;
+        }
+        else
+        {
+            NeighborPolities[polity] = 1;
+        }
+
+        Polity.IncreaseContact(polity);
+    }
+
+    private void UnsetNeighborFactionsFromProminence(PolityProminence prominence)
+    {
+        foreach (var p in prominence.NeighborProminences)
+        {
+            UnsetFactionsAsNeighbors(p.ClosestFaction, this);
+        }
+    }
+
+    private static void UnsetFactionsAsNeighbors(Faction a, Faction b)
+    {
+        a?.RemoveNeighborFaction(b);
+        b?.RemoveNeighborFaction(a);
+    }
+
+    public void RemoveNeighborFaction(Faction faction)
+    {
+        if ((faction == null) || (faction == this))
+        {
+            return;
+        }
+
+        if (NeighborFactions.ContainsKey(faction))
+        {
+            NeighborFactions[faction]--;
+
+            if (NeighborFactions[faction] == 0)
+            {
+                NeighborFactions.Remove(faction);
+            }
+        }
+
+        var polity = faction.Polity;
+
+        if (polity == Polity)
+        {
+            return;
+        }
+
+        if (NeighborPolities.ContainsKey(polity))
+        {
+            NeighborPolities[polity]--;
+
+            if (NeighborPolities[polity] == 0)
+            {
+                NeighborPolities.Remove(polity);
+            }
+        }
+
+        Polity.DecreaseContact(polity);
     }
 }

@@ -27,13 +27,13 @@ public abstract class DelayedSetValueEntity<T, S> : DelayedSetEntity<T>, IValueE
     public IBaseValueExpression BaseValueExpression => ValueExpression;
 
     public DelayedSetValueEntity(
-        ValueGetterMethod<T> getterMethod, Context c, string id)
-        : base(getterMethod, c, id)
+        ValueGetterMethod<T> getterMethod, Context c, string id, IEntity parent)
+        : base(getterMethod, c, id, parent)
     {
     }
 
-    public DelayedSetValueEntity(Context c, string id)
-        : base(c, id)
+    public DelayedSetValueEntity(Context c, string id, IEntity parent)
+        : base(c, id, parent)
     {
     }
 
@@ -49,16 +49,7 @@ public abstract class DelayedSetValueEntity<T, S> : DelayedSetEntity<T>, IValueE
         }
 
         throw new System.ArgumentException(
-            "DelayedSetValueEntity: Unable to find attribute: " + attributeId);
-    }
-
-    public override EntityAttribute GetThisEntityAttribute(Entity parent)
-    {
-        _thisAttribute =
-            _thisAttribute ?? new FixedValueEntityAttribute<IValueEntity<S>>(
-                this, Id, parent);
-
-        return _thisAttribute;
+            $"{Id}: Unable to find attribute: {attributeId}");
     }
 
     public override string GetDebugString()

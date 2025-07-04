@@ -13,25 +13,20 @@ public class RegionEntity : DelayedSetEntity<Region>
 
     protected override object _reference => Region;
 
-    public RegionEntity(Context c, string id) : base(c, id)
+    public RegionEntity(Context c, string id, IEntity parent) : base(c, id, parent)
     {
     }
 
     public RegionEntity(
-        ValueGetterMethod<Region> getterMethod, Context c, string id)
-        : base(getterMethod, c, id)
+        ValueGetterMethod<Region> getterMethod, Context c, string id, IEntity parent)
+        : base(getterMethod, c, id, parent)
     {
     }
 
     public RegionEntity(
-        TryRequestGenMethod<Region> tryRequestGenMethod, Context c, string id)
-        : base(tryRequestGenMethod, c, id)
+        TryRequestGenMethod<Region> tryRequestGenMethod, Context c, string id, IEntity parent)
+        : base(tryRequestGenMethod, c, id, parent)
     {
-    }
-
-    public override EntityAttribute GetAttribute(string attributeId, IExpression[] arguments = null)
-    {
-        throw new System.ArgumentException(Id + ": Unable to find attribute: " + attributeId);
     }
 
     public override string GetDebugString()

@@ -17,9 +17,18 @@ public static class ModParseUtility
     public const string AccessorRegexPart = @"\.";
 
     /// <summary>
+    /// Regex used to capture base values like numbers, booleans and identifiers
+    /// </summary>
+    public const string ValueRegexPart =
+        @"(?:" + NumberRegexPart +
+        @")|(?:" + BooleanRegexPart +
+        @")|(?:" + IdentifierRegexPart +
+        @")";
+
+    /// <summary>
     /// Regex used to capture base elements like numbers, booleans and identifiers
     /// </summary>
-    public const string BaseStatementRegexPart = 
+    public const string BaseStatementRegexPart =
         @"(?<number>" + NumberRegexPart +
         @")|(?<boolean>" + BooleanRegexPart +
         @")|(?<identifierStatement>" + IdentifierStatementRegexPart +
@@ -35,6 +44,19 @@ public static class ModParseUtility
                 @"(?<open>\()" +
             @"|" +
                 @"(?<innerStatement-open>\))" +
+            @")" +
+        @"[^\(\)]*?)+" +
+        @"(?(open)(?!))";
+
+    /// <summary>
+    /// Regex used to indentify statements enclosed within parenthesis, nonlabeled
+    /// </summary>
+    public const string NonlabInnerStatementRegexPart =
+        @"(?:" +
+            @"(?:" +
+                @"(?<open>\()" +
+            @"|" +
+                @"(?<ignore-open>\))" +
             @")" +
         @"[^\(\)]*?)+" +
         @"(?(open)(?!))";
@@ -92,13 +114,58 @@ public static class ModParseUtility
         @"(?(open)(?!))";
 
     /// <summary>
-    /// Regex used to indetify the first argument within a set of arguments (used recursively)
+    /// Regex used to indentify a set of argument statements given to a function, nonlabeled
+    /// </summary>
+    public const string NonlabArgumentsRegexPart =
+        @"(?:" +
+            @"(?:" +
+                @"(?<open>\()" +
+            @"|" +
+                @"(?<ignore-open>\))" +
+            @")" +
+        @"[^\(\)]*?)+" +
+        @"(?(open)(?!))";
+
+    /// <summary>
+    /// Regex used to select the first argument within a set of arguments (used recursively)
     /// </summary>
     public const string ArgumentListRegex =
         @"^\s*" +
         @"(?<argument>" + ArgumentRegexPart + @")\s*" +
         @"(?:," +
             @"(?<otherArgs>" +
+                @".*" +
+            @")" +
+        @")?$";
+
+    /// <summary>
+    /// Regex used to indentify a set of parameter identifiers given to a function
+    /// </summary>
+    public const string ParamIdsRegexPart =
+        @"(?:\[" +
+            @"(?<paramIds>" + IdentifierRegexPart + @"\s*" + 
+                @"(?:,\s*" + IdentifierRegexPart  + @"\s*)*" + 
+            @")" + 
+        @"\])";
+
+    /// <summary>
+    /// Regex used to indentify a set of parameter identifiers given to a function, nonlabeled
+    /// </summary>
+    public const string NonlabParamIdsRegexPart =
+        @"(?:\[" +
+            @"(?:" + IdentifierRegexPart + @"\s*" +
+                @"(?:,\s*" + IdentifierRegexPart + @"\s*)*" +
+            @")" +
+        @"\])";
+
+    /// <summary>
+    /// Regex used to select the first identifier within a set of identifiers (used recursively)
+    /// </summary>
+    public const string IdentifierListRegex =
+        @"^\s*" +
+        @"(?<identifier>" + IdentifierRegexPart + @")\s*" +
+        @"(?:," +
+            @"(?<otherIds>" +
                 @".*" +
             @")" +
         @")?$";
@@ -144,11 +211,30 @@ public static class ModParseUtility
         @")";
 
     /// <summary>
+    /// Regex used to indetify an accessible statement or entity, nonlabeled
+    /// </summary>
+    public const string NonlabAccessibleStatementRegexPart =
+        @"(?:" +
+            NonlabIdentifierStatementRegexPart +
+        @")|(?:" +
+            NonlabInnerStatementRegexPart +
+        @")";
+
+    /// <summary>
     /// Regex used to indentify an identifier (and it's possible arguments)
     /// </summary>
     public const string IdentifierStatementRegexPart =
         @"(?<identifier>" + IdentifierRegexPart + @")\s*" +
+        @"(?:" + ParamIdsRegexPart + @")?\s*" +
         @"(?:" + ArgumentsRegexPart + @")?";
+
+    /// <summary>
+    /// Regex used to indentify an identifier (and it's possible arguments), nonlabeled
+    /// </summary>
+    public const string NonlabIdentifierStatementRegexPart =
+        @"(?:" + IdentifierRegexPart + @")\s*" +
+        @"(?:" + NonlabParamIdsRegexPart + @")?\s*" +
+        @"(?:" + NonlabArgumentsRegexPart + @")?";
 
     /// <summary>
     /// Regex used to indentify a identifier (bounded)
@@ -194,14 +280,36 @@ public static class ModParseUtility
     /// </summary>
     public const string AccessorOpStatementRegexPart =
         @"(?<statement>" +
-            @"(?:" + AccessibleStatementRegexPart + @")" +
+            @"(?:" + NonlabAccessibleStatementRegexPart + @")" +
             @"(?:" +
                 AccessorRegexPart +
-                IdentifierStatementRegexPart +
+                NonlabIdentifierStatementRegexPart +
             @")*" +
         @")" +
         AccessorRegexPart +
         @"(?<attribute>" + IdentifierStatementRegexPart + @")";
+
+    /// <summary>
+    /// Regex used to capture assign on statement
+    /// </summary>
+    public const string AssignOnRegex =
+        @"^\s*(?<identifier>" + IdentifierRegexPart +
+        @")(?:\s*:\s*" + LabeledValuesRegexPart +
+        @")?\s*$";
+
+    /// <summary>
+    /// Regex used to indentify a set of values given to a statement
+    /// </summary>
+    public const string LabeledValuesRegexPart =
+        @"(?<values>" + LabeledValueRegexPart + @"\s*" +
+            @"(?:,\s*" + ValueRegexPart + @"\s*)*" +
+        @")";
+
+    /// <summary>
+    /// Regex used to indentify a a labeled value
+    /// </summary>
+    public const string LabeledValueRegexPart =
+        @"(?<value>" + ValueRegexPart + @")";
 
     /// <summary>
     /// Regex used to indentify an access operation (bounded)

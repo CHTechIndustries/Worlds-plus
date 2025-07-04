@@ -3,15 +3,20 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
-public class GroupEntity : DelayedSetEntity<CellGroup>
+public class GroupEntity : CulturalEntity<CellGroup>
 {
     public const string CellAttributeId = "cell";
-    public const string ProminenceAttributeId = "prominence";
-    public const string FactionCoresCountAttributeId = "faction_cores_count";
-    public const string FactionCoreDistanceAttributeId = "faction_core_distance";
-    public const string PreferencesAttributeId = "preferences";
-    public const string KnowledgesAttributeId = "knowledges";
-    public const string PolityWithHighestProminenceAttributeId = "polity_with_highest_prominence";
+    public const string ProminenceValueAttributeId = "prominence_value";
+    public const string GetCoreDistanceAttributeId = "get_core_distance";
+    public const string MostProminentPolityAttributeId = "most_prominent_polity";
+    public const string PresentPolitiesAttributeId = "present_polities";
+    public const string ClosestFactionsAttributeId = "closest_factions";
+    public const string NavigationRangeAttributeId = "navigation_range";
+    public const string ArabilityModifierAttributeId = "arability_modifier";
+    public const string AccessibilityModifierAttributeId = "accessibility_modifier";
+    public const string PropertiesAttributeId = "properties";
+    public const string PopulationAttributeId = "population";
+    public const string NeighborsAttributeId = "neighbors";
 
     public virtual CellGroup Group
     {
@@ -19,21 +24,33 @@ public class GroupEntity : DelayedSetEntity<CellGroup>
         private set => Setable = value;
     }
 
-    private ValueGetterEntityAttribute<float> _factionCoresCountAttribute;
+    private ValueGetterSetterEntityAttribute<float> _navigationRangeAttribute;
+    private ValueGetterSetterEntityAttribute<float> _arabilityModifierAttribute;
+    private ValueGetterSetterEntityAttribute<float> _accessibilityModifierAttribute;
+    private ValueGetterEntityAttribute<float> _populationAttribute;
 
     private CellEntity _cellEntity = null;
-    private PolityEntity _polityWithHighestProminenceEntity = null;
+    private PolityEntity _mostProminentPolityEntity = null;
+    private PolityCollectionEntity _presentPolitiesEntity = null;
+    private FactionCollectionEntity _closestFactionsEntity = null;
+    private ModifiableGroupPropertyContainerEntity _propertiesEntity = null;
+    private GroupCollectionEntity _neighborsEntity = null;
 
-    private AssignableCulturalPreferencesEntity _preferencesEntity = null;
-    private CulturalKnowledgesEntity _knowledgesEntity = null;
+    protected override object _reference => Group;
 
-    public GroupEntity(Context c, string id) : base(c, id)
+    public GroupEntity(Context c, string id, IEntity parent) : base(c, id, parent)
     {
     }
 
     public GroupEntity(
-        ValueGetterMethod<CellGroup> getterMethod, Context c, string id)
-        : base(getterMethod, c, id)
+        ValueGetterMethod<CellGroup> getterMethod, Context c, string id, IEntity parent)
+        : base(getterMethod, c, id, parent)
+    {
+    }
+
+    public GroupEntity(
+        TryRequestGenMethod<CellGroup> tryRequestGenMethod, Context c, string id, IEntity parent)
+        : base(tryRequestGenMethod, c, id, parent)
     {
     }
 
@@ -43,87 +60,194 @@ public class GroupEntity : DelayedSetEntity<CellGroup>
             _cellEntity ?? new CellEntity(
                 GetCell,
                 Context,
-                BuildAttributeId(CellAttributeId));
+                BuildAttributeId(CellAttributeId),
+                this);
 
-        return _cellEntity.GetThisEntityAttribute(this);
+        return _cellEntity.GetThisEntityAttribute();
     }
 
-    public EntityAttribute GetPolityWithHighestProminenceAttribute()
+    public EntityAttribute GetMostProminentPolityAttribute()
     {
-        _polityWithHighestProminenceEntity =
-            _polityWithHighestProminenceEntity ?? new PolityEntity(
-                GetPolityWithHighestProminence,
+        _mostProminentPolityEntity =
+            _mostProminentPolityEntity ?? new PolityEntity(
+                GetMostProminentPolity,
                 Context,
-                BuildAttributeId(PolityWithHighestProminenceAttributeId));
+                BuildAttributeId(MostProminentPolityAttributeId),
+                this);
 
-        return _polityWithHighestProminenceEntity.GetThisEntityAttribute(this);
+        return _mostProminentPolityEntity.GetThisEntityAttribute();
     }
 
-    public EntityAttribute GetPreferencesAttribute()
+    public EntityAttribute GetPresentPolitiesAttribute()
     {
-        _preferencesEntity =
-            _preferencesEntity ?? new AssignableCulturalPreferencesEntity(
-                GetCulture,
+        _presentPolitiesEntity =
+            _presentPolitiesEntity ?? new PolityCollectionEntity(
+                GetPresentPolities,
                 Context,
-                BuildAttributeId(PreferencesAttributeId));
+                BuildAttributeId(PresentPolitiesAttributeId),
+                this);
 
-        return _preferencesEntity.GetThisEntityAttribute(this);
+        return _presentPolitiesEntity.GetThisEntityAttribute();
     }
 
-    public EntityAttribute GetKnowledgesAttribute()
+    public EntityAttribute GetClosestFactionsAttribute()
     {
-        _knowledgesEntity =
-            _knowledgesEntity ?? new CulturalKnowledgesEntity(
-                GetCulture,
+        _closestFactionsEntity =
+            _closestFactionsEntity ?? new FactionCollectionEntity(
+                GetClosestFactions,
                 Context,
-                BuildAttributeId(KnowledgesAttributeId));
+                BuildAttributeId(ClosestFactionsAttributeId),
+                this);
 
-        return _knowledgesEntity.GetThisEntityAttribute(this);
+        return _closestFactionsEntity.GetThisEntityAttribute();
     }
 
-    protected override object _reference => Group;
+    private EntityAttribute GetPropertiesAttribute()
+    {
+        _propertiesEntity =
+            _propertiesEntity ?? new ModifiableGroupPropertyContainerEntity(
+                GetGroup,
+                Context,
+                BuildAttributeId(PropertiesAttributeId),
+                this);
+
+        return _propertiesEntity.GetThisEntityAttribute();
+    }
+
+    protected override ICulturalActivitiesEntity CreateCulturalActivitiesEntity() =>
+        new ModifiableCellCulturalActivitiesEntity(
+            GetCulture,
+            Context,
+            BuildAttributeId(ActivitiesAttributeId),
+            this);
+
+    protected override ICulturalSkillsEntity CreateCulturalSkillsEntity() =>
+        new ModifiableCellCulturalSkillsEntity(
+            GetCulture,
+            Context,
+            BuildAttributeId(SkillsAttributeId),
+            this);
+
+    protected override ICulturalKnowledgesEntity CreateCulturalKnowledgesEntity() =>
+        new ModifiableCellCulturalKnowledgesEntity(
+            GetCulture,
+            Context,
+            BuildAttributeId(KnowledgesAttributeId),
+            this);
+
+    protected override ICulturalDiscoveriesEntity CreateCulturalDiscoveriesEntity() =>
+        new ModifiableCulturalDiscoveriesEntity(
+            GetCulture,
+            Context,
+            BuildAttributeId(DiscoveriesAttributeId),
+            this);
+
+    private ICollection<Polity> GetPresentPolities() => Group.PresentPolities;
+
+    private ICollection<Faction> GetClosestFactions() => Group.ClosestFactions;
+
+    private void UpdateNavigationRangeModifier(float value)
+    {
+        Group.NavigationRangeModifier = value;
+        Group.SetToUpdate(warnIfUnexpected: false);
+    }
+
+    private void UpdateArabilityModifier(float value)
+    {
+        Group.ArabilityModifier = value;
+        Group.SetToUpdate(warnIfUnexpected: false);
+    }
+
+    private void UpdateAccessibilityModifier(float value)
+    {
+        Group.AccessibilityModifier = value;
+        Group.SetToUpdate(warnIfUnexpected: false);
+    }
+
+    public ICollection<CellGroup> GetNeighbors() => Group.Neighbors.Values;
+
+    public EntityAttribute GetNeighborsAttribute()
+    {
+        _neighborsEntity =
+            _neighborsEntity ?? new GroupCollectionEntity(
+            GetNeighbors,
+            Context,
+            BuildAttributeId(NeighborsAttributeId),
+            this);
+
+        return _neighborsEntity.GetThisEntityAttribute();
+    }
 
     public override EntityAttribute GetAttribute(string attributeId, IExpression[] arguments = null)
     {
         switch (attributeId)
         {
+            case NeighborsAttributeId:
+                return GetNeighborsAttribute();
+
             case CellAttributeId:
                 return GetCellAttribute();
 
-            case ProminenceAttributeId:
-                return new ProminenceAttribute(this, arguments);
+            case ProminenceValueAttributeId:
+                return new ProminenceValueAttribute(this, arguments);
 
-            case FactionCoresCountAttributeId:
-                _factionCoresCountAttribute =
-                    _factionCoresCountAttribute ?? new ValueGetterEntityAttribute<float>(
-                        FactionCoresCountAttributeId, this, () => Group.GetFactionCores().Count);
-                return _factionCoresCountAttribute;
+            case GetCoreDistanceAttributeId:
+                return new GetCoreDistanceAttribute(this, arguments);
 
-            case FactionCoreDistanceAttributeId:
-                return new FactionCoreDistanceAttribute(this, arguments);
+            case MostProminentPolityAttributeId:
+                return GetMostProminentPolityAttribute();
 
-            case PreferencesAttributeId:
-                return GetPreferencesAttribute();
+            case PresentPolitiesAttributeId:
+                return GetPresentPolitiesAttribute();
 
-            case KnowledgesAttributeId:
-                return GetKnowledgesAttribute();
+            case ClosestFactionsAttributeId:
+                return GetClosestFactionsAttribute();
 
-            case PolityWithHighestProminenceAttributeId:
-                return GetPolityWithHighestProminenceAttribute();
+            case PropertiesAttributeId:
+                return GetPropertiesAttribute();
+
+            case NavigationRangeAttributeId:
+                _navigationRangeAttribute =
+                    _navigationRangeAttribute ?? new ValueGetterSetterEntityAttribute<float>(
+                        NavigationRangeAttributeId, 
+                        this, 
+                        () => Group.NavigationRangeModifier,
+                        UpdateNavigationRangeModifier);
+                return _navigationRangeAttribute;
+
+            case ArabilityModifierAttributeId:
+                _arabilityModifierAttribute =
+                    _arabilityModifierAttribute ?? new ValueGetterSetterEntityAttribute<float>(
+                        ArabilityModifierAttributeId,
+                        this,
+                        () => Group.ArabilityModifier,
+                        UpdateArabilityModifier);
+                return _arabilityModifierAttribute;
+
+            case AccessibilityModifierAttributeId:
+                _accessibilityModifierAttribute =
+                    _accessibilityModifierAttribute ?? new ValueGetterSetterEntityAttribute<float>(
+                        AccessibilityModifierAttributeId,
+                        this,
+                        () => Group.AccessibilityModifier,
+                        UpdateAccessibilityModifier);
+                return _accessibilityModifierAttribute;
+
+            case PopulationAttributeId:
+                _populationAttribute =
+                    _populationAttribute ?? new ValueGetterEntityAttribute<float>(
+                        PopulationAttributeId,
+                        this,
+                        () => Group.Population);
+                return _populationAttribute;
         }
 
-        throw new System.ArgumentException("Group: Unable to find attribute: " + attributeId);
+        return base.GetAttribute(attributeId, arguments);
     }
 
-    public override string GetDebugString()
-    {
-        return "group:" + Group.Cell.Position.ToString();
-    }
+    public override string GetDebugString() => $"group:{Group.Cell.Position}";
 
-    public override string GetFormattedString()
-    {
-        return Group.Cell.Position.ToString().ToBoldFormat();
-    }
+    public override string GetFormattedString() => Group.Cell.Position.ToBoldString();
 
     protected override void ResetInternal()
     {
@@ -133,15 +257,20 @@ public class GroupEntity : DelayedSetEntity<CellGroup>
         }
 
         _cellEntity?.Reset();
-        _polityWithHighestProminenceEntity?.Reset();
+        _mostProminentPolityEntity?.Reset();
+        _presentPolitiesEntity?.Reset();
+        _closestFactionsEntity?.Reset();
+        _propertiesEntity?.Reset();
+        _neighborsEntity?.Reset();
 
-        _preferencesEntity?.Reset();
-        _knowledgesEntity?.Reset();
+        base.ResetInternal();
     }
 
-    public TerrainCell GetCell() => Group.Cell;
+    private TerrainCell GetCell() => Group.Cell;
 
-    public Polity GetPolityWithHighestProminence() => Group.HighestPolityProminence?.Polity;
+    private Polity GetMostProminentPolity() => Group.HighestPolityProminence?.Polity;
 
-    public Culture GetCulture() => Group.Culture;
+    protected override Culture GetCulture() => Group.Culture;
+
+    private CellGroup GetGroup() => Group;
 }

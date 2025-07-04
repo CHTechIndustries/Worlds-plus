@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/Scripts/WorldEngine/Cultures/Preferences/PreferenceGenerator.cs.meta
 guid: 7d359b8ecdc02453a9cdd0996992d686
+========
+guid: c1ec59858e5ad463aafb6a27e5e7254c
+>>>>>>>> enhanced-map-2:Assets/Scripts/WorldEngine/Events/MigratePopulationEvent.cs.meta
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2

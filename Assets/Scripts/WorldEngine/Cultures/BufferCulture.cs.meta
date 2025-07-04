@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/Scripts/WorldEngine/Cultures/BufferCulture.cs.meta
 guid: 9d8de6c6294834dad927cb8c672e94c0
+========
+guid: 502b47777333c4c0391e26258df1d475
+>>>>>>>> enhanced-map-2:Assets/Scripts/WorldEngine/Cultures/Preferences/PreferenceLoader.cs.meta
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2

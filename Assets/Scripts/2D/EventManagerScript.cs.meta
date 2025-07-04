@@ -1,5 +1,9 @@
 fileFormatVersion: 2
+<<<<<<<< HEAD:Assets/Scripts/2D/EventManagerScript.cs.meta
 guid: d82d80dd0d7214afabc928c87bc21b9f
+========
+guid: 9d8de6c6294834dad927cb8c672e94c0
+>>>>>>>> enhanced-map-2:Assets/Scripts/WorldEngine/Cultures/BufferCulture.cs.meta
 MonoImporter:
   externalObjects: {}
   serializedVersion: 2

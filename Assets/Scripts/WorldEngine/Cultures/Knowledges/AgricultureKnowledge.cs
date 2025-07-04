@@ -1,0 +1,99 @@
+using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using System.Xml;
+using System.Xml.Serialization;
+using UnityEngine.Profiling;
+
+public class AgricultureKnowledge : CellCulturalKnowledge
+{
+    public const string KnowledgeId = "agriculture";
+    public const string KnowledgeName = "agriculture";
+
+    public const float BaseLimit = KnowledgeLimit.MinLimitValue;
+
+    public const int KnowledgeRngOffset = 1;
+
+    public const float TimeEffectConstant = CellGroup.GenerationSpan * 2000;
+    public const float TerrainFactorModifier = 1.5f;
+    public const float MinAccesibility = 0.2f;
+
+    [XmlIgnore]
+    public float TerrainFactor;
+
+    public AgricultureKnowledge()
+    {
+    }
+
+    public AgricultureKnowledge(CellGroup group, float initialValue, KnowledgeLimit limit) 
+        : base(group, KnowledgeId, KnowledgeName, KnowledgeRngOffset, initialValue, limit)
+    {
+        UpdateTerrainFactor();
+    }
+
+    public static bool IsAgricultureKnowledge(CulturalKnowledge knowledge)
+    {
+        return knowledge.Id.Contains(KnowledgeId);
+    }
+
+    public override void FinalizeLoad()
+    {
+        base.FinalizeLoad();
+
+        UpdateTerrainFactor();
+    }
+
+    public void UpdateTerrainFactor()
+    {
+        TerrainFactor = CalculateTerrainFactorIn(Group.Cell);
+    }
+
+    public static float CalculateTerrainFactorIn(TerrainCell cell)
+    {
+        float accesibilityFactor = (cell.Accessibility - MinAccesibility) / (1f - MinAccesibility);
+
+        return Mathf.Clamp01(cell.Arability * cell.Accessibility * accesibilityFactor);
+    }
+
+    protected override void UpdateInternal(long timeSpan)
+    {
+        UpdateTerrainFactor();
+
+        UpdateValueInternal(timeSpan, TimeEffectConstant, TerrainFactor * TerrainFactorModifier);
+    }
+
+    public override void AddPolityProminenceEffect(CulturalKnowledge polityKnowledge, PolityProminence polityProminence, long timeSpan)
+    {
+        AddPolityProminenceEffectInternal(polityKnowledge, polityProminence, timeSpan, TimeEffectConstant);
+    }
+
+    public override float CalculateExpectedProgressLevel()
+    {
+        if (TerrainFactor <= 0)
+            return 1;
+
+//#if DEBUG
+//        if ((Manager.RegisterDebugEvent != null) && (Manager.TracingData.Priority <= 0))
+//        {
+//            if (Group.Id == Manager.TracingData.GroupId)
+//            {
+//                SaveLoadTest.DebugMessage debugMessage = new SaveLoadTest.DebugMessage(
+//                    "AgricultureKnowledge.CalculateExpectedProgressLevel -  Group.Id:" + Group.Id,
+//                    "CurrentDate: " + Group.World.CurrentDate +
+//                    ", _terrainFactor: " + _terrainFactor +
+//                    ", ProgressLevel: " + ProgressLevel +
+//                    "");
+
+//                Manager.RegisterDebugEvent("DebugMessage", debugMessage);
+//            }
+//        }
+//#endif
+
+        return Mathf.Clamp(ProgressLevel / TerrainFactor, MinProgressLevel, 1);
+    }
+
+    public override float CalculateTransferFactor()
+    {
+        return (TerrainFactor * 0.9f) + 0.1f;
+    }
+}

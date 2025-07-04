@@ -1,14 +1,11 @@
+using ProtoBuf;
 using UnityEngine;
-using System.Collections;
-using System.Collections.Generic;
-using System.Xml;
-using System.Xml.Serialization;
 
+[ProtoContract]
 public class CellCulturalPreference : CulturalPreference
 {
     public const float TimeEffectConstant = CellGroup.GenerationSpan * 500;
 
-    [XmlIgnore]
     public CellGroup Group;
 
     private const float MaxChangeDelta = 0.2f;
@@ -96,7 +93,7 @@ public class CellCulturalPreference : CulturalPreference
             targetValue = Value - (minTargetValue - Value) * randomFactor;
         }
 
-        float timeEffect = timeSpan / (float)(timeSpan + TimeEffectConstant);
+        float timeEffect = timeSpan / (timeSpan + TimeEffectConstant);
 
         _newValue = (Value * (1 - timeEffect)) + (targetValue * timeEffect);
     }
@@ -114,7 +111,7 @@ public class CellCulturalPreference : CulturalPreference
 
         float randomEffect = groupCell.GetNextLocalRandomFloat(rngOffset);
 
-        float timeEffect = timeSpan / (float)(timeSpan + TimeEffectConstant);
+        float timeEffect = timeSpan / (timeSpan + TimeEffectConstant);
 
         // _newvalue should have been set correctly either by the constructor or by the Update function
         float change = (targetValue - _newValue) * prominenceEffect * timeEffect * randomEffect;

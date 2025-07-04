@@ -1,0 +1,4 @@
+This folder is to allow easy transfer between branches
+what that means is anything put in this folder will be ignored (the path is in the .gitignore), allowing it to stay unchanged when you switch branches in the desktop app (good if you make something and decide it should be on another branch)
+
+However, anything in this folder via github.com stays, as well as stuff commited before the addition to the .gitignore, which makes this file enforce the existance of said folder

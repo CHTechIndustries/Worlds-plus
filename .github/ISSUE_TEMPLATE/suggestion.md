@@ -1,6 +1,6 @@
 ---
 name: Suggestion
-about: 
+about: A place to put suggestions
 title: "[Suggestion]:"
 labels: enhancement
 assignees: ''

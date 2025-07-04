@@ -1,0 +1,1 @@
+the pull-request template is a bit more finicky than the issue templates, hence it's more isolated
